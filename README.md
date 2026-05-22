@@ -163,6 +163,28 @@ JPG로 저장하려면 저장 대상 페이지를 선택한 뒤 `JPG 저장` 버
 
 단, 서명 이미지가 많거나 파일 크기가 큰 경우 브라우저 저장 용량 제한에 걸릴 수 있습니다. 중요한 작업은 JSON 파일로 별도 저장하는 것이 안전합니다.
 
+## 외부 라이브러리 및 CDN 의존성
+
+현재 버전은 별도의 빌드 과정 없이 단일 HTML 파일에서 외부 CDN 라이브러리를 직접 불러와 실행합니다.
+
+사용 중인 주요 외부 라이브러리는 다음과 같습니다.
+
+| 라이브러리 | 용도 |
+|---|---|
+| PDF.js | 브라우저에서 PDF 파일을 읽고 각 페이지를 canvas로 렌더링 |
+| pdf-lib | 원본 PDF 위에 텍스트, 체크표시, 서명 이미지를 합성하여 새 PDF 생성 |
+| fontkit | pdf-lib에서 외부 한글 폰트를 PDF에 임베드하기 위해 사용 |
+| JSZip | 여러 페이지를 JPG로 저장할 때 ZIP 파일로 묶어 다운로드 |
+| Google Fonts / Nanum Gothic | 화면 표시용 한글 웹폰트 |
+| Noto Sans CJK KR | PDF 저장 시 한글 텍스트 출력을 위한 임베드 폰트 |
+
+현재 `index.html`에서는 다음 CDN 리소스를 사용합니다.
+
+```html
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
 ## GitHub Pages 배포
 
 이 프로젝트는 정적 HTML 파일 기반이므로 GitHub Pages로 배포할 수 있습니다.
