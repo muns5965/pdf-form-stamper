@@ -1,0 +1,2908 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>서식 텍스트 입력기 v40</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap');
+:root{
+  --bg:#f0f2f5;
+  --white:#ffffff;
+  --border:#dde1e7;
+  --border-light:#eaedf1;
+  --accent:#2563eb;
+  --accent-light:#eff6ff;
+  --accent-hover:#1d4ed8;
+  --danger:#dc2626;
+  --success:#16a34a;
+  --text:#1e293b;
+  --text-muted:#64748b;
+  --text-light:#94a3b8;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 16px rgba(0,0,0,.10);
+  --radius:10px;
+  --sidebar:340px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(--text);background:var(--bg);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── 상단바 ── */
+.topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;background:var(--white);border-bottom:1px solid var(--border);flex-shrink:0;z-index:40}
+.topbar-logo{font-weight:700;font-size:15px;letter-spacing:-.3px;color:var(--accent);white-space:nowrap}
+.topbar-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
+.topbar-right{display:flex;gap:8px;align-items:center;margin-left:auto}
+.upload-btn{position:relative;overflow:hidden;cursor:pointer}
+.upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:7px;padding:6px 13px;font-size:13px;font-family:inherit;cursor:pointer;background:var(--white);color:var(--text);transition:all .15s;white-space:nowrap;font-weight:700}
+.btn:hover{background:#f8fafc;border-color:#c0c8d4}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.accent:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.danger{border-color:var(--danger);color:var(--danger)}
+.btn.danger:hover{background:#fef2f2}
+.btn.sm{padding:4px 10px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+.file-label{font-size:13px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 메인 레이아웃 ── */
+.layout{display:flex;flex:1;overflow:hidden}
+
+/* ── 사이드바 ── */
+.sidebar{width:var(--sidebar);flex-shrink:0;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:10px 4px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panel{display:none;flex:1;overflow-y:auto;padding:14px}
+.tab-panel.active{display:block}
+
+/* ── 입력 탭 ── */
+.field-group{margin-bottom:8px}
+.field-group-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border-light)}
+.quick-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;border:1px solid var(--border-light);border-radius:7px;padding:6px 8px;background:#fafbfc;cursor:pointer;transition:all .15s}
+.quick-row:hover{border-color:var(--accent);background:var(--accent-light)}
+.quick-row.focused{border-color:var(--accent);background:var(--accent-light);box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+.quick-row.has-value{background:#f0fdf4;border-color:#86efac}
+.quick-row label{font-size:12px;color:var(--text-muted);min-width:90px;flex-shrink:0;cursor:pointer;font-weight:700}
+.quick-row input{flex:1;border:none;background:transparent;font:inherit;font-size:13px;color:var(--text);outline:none;padding:0;min-width:0}
+.quick-row input::placeholder{color:var(--text-light)}
+.quick-row .check-wrap{display:flex;gap:4px;flex-wrap:wrap}
+.check-btn{border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:12px;cursor:pointer;background:var(--white);color:var(--text);transition:all .12s;font-family:inherit;display:inline-flex;align-items:center}
+.check-btn:hover{border-color:var(--accent);color:var(--accent)}
+.check-btn.on{background:var(--accent-light);border-color:var(--accent);color:var(--accent)}
+.check-btn.on .chk-sym{color:var(--accent)}
+.empty-hint{text-align:center;padding:32px 16px;color:var(--text-light);font-size:13px;line-height:1.6}
+.empty-hint .icon{font-size:32px;margin-bottom:8px}
+
+/* ── 필드 편집 탭 ── */
+.edit-section{margin-bottom:14px}
+.edit-section-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.form-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.form-row label{font-size:12px;color:var(--text-muted);min-width:72px;flex-shrink:0}
+.form-row input,.form-row select,.form-row textarea{flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit;font-size:13px;color:var(--text);background:#fff;min-width:0}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+.form-row textarea{min-height:56px;resize:vertical}
+.no-field-msg{text-align:center;padding:24px;color:var(--text-light);font-size:13px}
+.field-list-item{border:1px solid var(--border-light);border-radius:7px;padding:7px 10px;margin-bottom:4px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .12s}
+.field-list-item:hover{border-color:var(--accent)}
+.field-list-item.active{border-color:var(--accent);background:var(--accent-light)}
+.field-list-item .fli-icon{width:20px;height:20px;border-radius:4px;background:var(--accent-light);color:var(--accent);font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.field-list-item.active .fli-icon{background:var(--accent);color:#fff}
+.field-list-item .fli-info{flex:1;min-width:0}
+.field-list-item .fli-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.field-list-item .fli-pos{font-size:11px;color:var(--text-light)}
+.field-list-item .fli-val{font-size:11px;color:var(--success);font-weight:700;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.coord-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+.coord-grid .form-row{min-width:0;gap:4px}
+.coord-grid .form-row label{min-width:16px;width:16px;flex:0 0 16px}
+.coord-grid .form-row input{width:100%;min-width:0}
+.adv-toggle{font-size:12px;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:8px;user-select:none}
+.adv-panel{display:none}
+.adv-panel.open{display:block}
+.divider{height:1px;background:var(--border-light);margin:12px 0}
+.pill-badge{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border-radius:4px;padding:2px 6px;font-size:11px;color:var(--text-muted);border:1px solid var(--border-light)}
+.pill-badge.green{background:#f0fdf4;color:var(--success);border-color:#bbf7d0}
+.pill-badge.blue{background:var(--accent-light);color:var(--accent);border-color:#bfdbfe}
+.status-bar{padding:8px 14px;background:#f8fafc;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);flex-shrink:0;display:flex;align-items:center;gap:6px}
+
+/* ── 뷰어 ── */
+.viewer-area{flex:1;overflow-y:auto;overflow-x:hidden;background:var(--bg);padding:24px;position:relative}
+/* page-wrap 상단에 note-bar(18px) 공간 확보 — bar가 위로 튀어나와 스크롤 유발 방지 */
+.page-wrap{position:relative;margin:0 auto 24px;margin-top:20px;background:var(--white);box-shadow:var(--shadow-md);width:max-content;border-radius:2px}
+.page-label{position:absolute;left:0;top:-26px;font-size:11px;color:var(--text-muted);background:var(--white);padding:2px 8px;border-radius:4px;border:1px solid var(--border)}
+canvas.page-canvas{display:block}
+.overlay{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:all;cursor:crosshair}
+/* ── 포스트잇 스탬프 ── */
+.note{position:absolute;box-sizing:border-box;min-width:60px;min-height:22px;
+  background:rgba(255,255,180,0.92);border:2px solid #d4b800;border-radius:3px;
+  box-shadow:1px 2px 6px rgba(0,0,0,.18);
+  cursor:grab;user-select:none;z-index:5;pointer-events:all;
+  display:flex;flex-direction:column;overflow:visible;
+  transition:background .15s,border-color .15s,box-shadow .15s}
+.note:active{cursor:grabbing}
+.note.empty{background:rgba(220,235,255,0.88);border-color:#93c5fd}
+/* 선택(활성) — 더 진한 노랑+파란 테두리+그림자로 강조 */
+.note.active{
+  background:rgba(255,220,80,0.97)!important;
+  border:2px solid var(--accent)!important;
+  box-shadow:0 0 0 3px rgba(37,99,235,.18),2px 4px 14px rgba(0,0,0,.25)!important;
+  z-index:20!important}
+.note.empty.active{background:rgba(186,214,255,0.97)!important;border-color:var(--accent)!important}
+/* 노트 상단 핸들바 */
+/* 비활성 핸들바 — 노란 계열 */
+.note-bar{
+  position:absolute;left:0;right:0;top:-18px;height:18px;
+  background:rgba(212,184,0,0.45);border-radius:2px 2px 0 0;
+  cursor:grab;display:flex;align-items:center;padding:0 4px;gap:3px;
+  font-size:10px;letter-spacing:1px;justify-content:space-between;transition:background .15s;
+  z-index:100;pointer-events:all}  /* z-index 높여 인접 page-wrap에 가려지지 않게 */
+/* 활성 상태 핸들바 — 초록 */
+.note.active .note-bar{background:rgba(34,197,94,0.55)!important}
+.note-bar::before{content:'⠿';color:rgba(0,0,0,.25);font-size:11px;flex-shrink:0}
+.note-bar-label{flex:1;font-size:9px;color:rgba(0,0,0,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note-del{width:12px;height:12px;border-radius:50%;background:rgba(200,0,0,.25);
+  border:none;cursor:pointer;font-size:9px;color:rgba(100,0,0,.7);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+.note-del:hover{background:rgba(220,38,38,.8);color:#fff}
+.note-copy{width:12px;height:12px;border-radius:50%;background:rgba(34,197,94,.22);
+  border:none;cursor:pointer;font-size:9px;color:rgba(20,83,45,.8);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;line-height:1}
+.note-copy:hover{background:rgba(34,197,94,.85);color:#fff}
+/* 노트 내용 */
+.note-body{flex:1;display:flex;align-items:flex-start;padding:2px 4px;min-height:18px;word-break:break-all;white-space:pre-wrap;line-height:1.2;cursor:text;user-select:text;-webkit-user-select:text}
+.note.check .note-body{justify-content:center;align-items:center;font-size:14px;font-weight:700}
+/* 체크 포스트잇 — 텍스트와 동일한 반투명 수준(0.42) */
+.note.check{background:rgba(255,255,180,0.42)!important;border-color:rgba(180,150,0,0.45)!important;box-shadow:1px 2px 6px rgba(0,0,0,.12)!important}
+.note.check.empty{background:rgba(220,235,255,0.42)!important;border-color:rgba(96,165,250,0.55)!important}
+.note.check.active{background:rgba(187,247,208,0.24)!important;border-color:#22c55e!important;box-shadow:0 0 0 3px rgba(34,197,94,0.18),1px 2px 8px rgba(0,0,0,.18)!important}
+/* 체크 note-bar: 기본 노랑 핸들바 상속 */
+/* 체크 active note-bar: 기본 초록 핸들바 상속 */
+/* 리사이즈 핸들 */
+.note-resize{position:absolute;right:-5px;bottom:-5px;width:12px;height:12px;
+  background:#fff;border:2px solid #93c5fd;border-radius:2px;cursor:se-resize;
+  pointer-events:all;z-index:6}
+.note-resize-w{position:absolute;left:-5px;bottom:-5px;width:12px;height:12px;
+  background:#fff;border:2px solid #fca5a5;border-radius:2px;cursor:sw-resize;
+  pointer-events:all;z-index:6}
+/* 더블클릭 인라인 편집 */
+/* text-shadow: 흰 halo — 포스트잇 배경이 반투명이어도 텍스트가 선명하게 보임 */
+.note-input{all:unset;flex:1;font-family:inherit;line-height:1.2;word-break:break-all;white-space:pre-wrap;cursor:text;min-width:20px;user-select:text;pointer-events:all;-webkit-user-select:text;
+  text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 2px #fff}
+.debug .note::after{content:attr(data-pos);position:absolute;left:0;top:-18px;font-size:9px;color:var(--danger);background:#fff;border:1px solid #fca5a5;border-radius:3px;padding:0 3px;white-space:nowrap;pointer-events:none}
+
+/* 서명 노트 — 비활성은 텍스트와 동일한 노란 계열 테두리, 활성만 초록 */
+.note.sign{background:rgba(220,252,231,0.42)!important;border-color:rgba(180,150,0,0.45)!important;box-shadow:1px 2px 6px rgba(0,0,0,.12)!important}
+.note.sign.active{background:rgba(187,247,208,0.24)!important;border-color:#22c55e!important;box-shadow:0 0 0 3px rgba(34,197,94,.18),1px 2px 8px rgba(0,0,0,.18)!important}
+/* 서명 note-bar: 기본 노랑 핸들바 상속 */
+/* 서명 active note-bar: 기본 초록 핸들바 상속 */
+/* Fix: note-body에 pointer-events:all 명시 — 미리보기 OFF 상태에서 서명 클릭·선택이 안 되는 버그 수정 */
+.note.sign .note-body{padding:0!important;pointer-events:all!important;cursor:grab!important}
+.note.sign img{width:100%;height:100%;object-fit:contain;display:block;border-radius:0 0 2px 2px;pointer-events:none}
+
+/* v21: 체크 전용 노트는 전역 .note.active 진노랑 정책에서 완전히 제외 */
+/* 체크 노트 overlay: 텍스트 포스트잇과 동일한 불투명도 적용 */
+
+
+/* v28: 활성 포스트잇 배경 정책 조정
+   - 활성 텍스트: 진노랑 제거, 연초록 + 테두리 강조
+   - 활성 체크: 원본 체크박스 윤곽 확인을 위해 거의 투명 유지
+   - 비활성 입력값: 연노랑은 유지하되 92% → 42%로 낮춤
+*/
+/* 텍스트 노트 overlay — v28 원래 값 유지 (연한 반투명) */
+.overlay .note:not(.empty):not(.check):not(.sign){
+  background:rgba(255,255,180,0.42)!important;
+  border-color:rgba(180,150,0,0.45)!important;
+  box-shadow:1px 2px 6px rgba(0,0,0,.12)!important;
+}
+.overlay .note.empty:not(.check):not(.sign){
+  background:rgba(220,235,255,0.42)!important;
+  border-color:rgba(96,165,250,0.55)!important;
+}
+.overlay .note.active:not(.check):not(.sign){
+  background:rgba(187,247,208,0.24)!important;
+  border:2px solid #22c55e!important;
+  box-shadow:0 0 0 3px rgba(34,197,94,0.18),1px 2px 8px rgba(0,0,0,.18)!important;
+  z-index:20!important;
+}
+.overlay .note.empty.active:not(.check):not(.sign){
+  background:rgba(219,234,254,0.28)!important;
+  border:2px solid #22c55e!important;
+  box-shadow:0 0 0 3px rgba(34,197,94,0.18),1px 2px 8px rgba(0,0,0,.16)!important;
+}
+/* overlay active note-bar: 기본 초록 핸들바 상속 */
+
+/* 체크 노트 overlay — 텍스트와 동일한 수준(0.42)으로, 기존 0.08보다 선명하게 */
+.overlay .note.check{
+  background:rgba(255,255,180,0.42)!important;
+  border-color:rgba(180,150,0,0.45)!important;
+  box-shadow:1px 2px 6px rgba(0,0,0,.12)!important;
+}
+.overlay .note.check.empty{
+  background:rgba(220,235,255,0.42)!important;
+  border-color:rgba(96,165,250,0.55)!important;
+}
+.overlay .note.check.active{
+  background:rgba(187,247,208,0.24)!important;
+  border:2px solid #22c55e!important;
+  box-shadow:0 0 0 3px rgba(34,197,94,0.18),1px 2px 8px rgba(0,0,0,.18)!important;
+  z-index:20!important;
+}
+.overlay .note.check.empty.active{
+  background:rgba(219,234,254,0.28)!important;
+  border:2px solid #22c55e!important;
+  box-shadow:0 0 0 3px rgba(34,197,94,0.18),1px 2px 8px rgba(0,0,0,.16)!important;
+  z-index:20!important;
+}
+/* 체크 overlay note-bar: 기본 핸들바 상속 */
+
+/* ── 서명 모달 ── */
+.sign-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.sign-modal-bg.hidden{display:none}
+.sign-modal{background:#fff;border-radius:12px;padding:20px;width:480px;max-width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.sign-modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text)}
+.sign-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.sign-tab{flex:1;padding:8px;text-align:center;font-size:13px;cursor:pointer;background:#f8fafc;border:none;font-family:inherit;font-weight:700;color:var(--text-muted);transition:all .15s}
+.sign-tab.active{background:var(--accent);color:#fff}
+.sign-panel{display:none}
+.sign-panel.active{display:block}
+#signCanvas{border:1.5px solid var(--border);border-radius:8px;cursor:crosshair;display:block;background:#fff;touch-action:none}
+.sign-canvas-wrap{position:relative}
+.sign-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:13px;color:var(--text-light);pointer-events:none;text-align:center;line-height:1.6}
+/* ── 모달 ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-bg.hidden{display:none}
+.modal{background:var(--white);border-radius:12px;padding:20px;max-width:460px;width:100%;box-shadow:var(--shadow-md)}
+.modal h3{font-size:15px;margin-bottom:12px}
+.modal p{font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:14px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ── JSON 탭 ── */
+.json-section{display:flex;flex-direction:column;gap:6px}
+.json-section-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px}
+.json-desc{font-size:12px;color:var(--text-muted);line-height:1.5}
+.json-hint{font-size:11px;color:var(--text-light);line-height:1.5;padding:4px 6px;background:#f8fafc;border-radius:5px;border-left:2px solid var(--border)}
+.json-divider{height:1px;background:var(--border-light);margin:2px 0}
+
+/* ── 상태 ── */
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:var(--text-muted)}
+.welcome .big-icon{font-size:48px}
+.welcome p{font-size:14px;text-align:center;line-height:1.7;max-width:300px}
+.welcome .w-btn{margin-top:8px}
+
+
+/* ── v30 사용자 편의 UI: 명시적 추가 모드 / 선택 필드 미니바 / JPG 대상 버튼 / 미리보기 ── */
+.overlay{cursor:default!important}
+body.add-mode .overlay{cursor:crosshair!important}
+.btn.mode-active{background:#dbeafe!important;border-color:#2563eb!important;color:#1d4ed8!important;box-shadow:0 0 0 2px rgba(37,99,235,.16)}
+.btn.preview-active{background:#111827!important;border-color:#111827!important;color:#fff!important}
+.jpg-page-buttons{display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:330px}
+.jpg-page-buttons .btn{padding:4px 8px;font-size:11px;font-weight:700}
+.jpg-page-buttons .btn.active{background:#0891b2;border-color:#0891b2;color:#fff}
+.status-bar{flex-direction:column;align-items:stretch;gap:6px}
+.status-line{display:flex;align-items:center;gap:6px;min-height:18px}
+.selected-mini{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--border-light);padding-top:6px}
+.selected-mini.hidden{display:none!important}
+.selected-mini-info{font-size:11px;color:var(--text);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selected-mini-actions{display:flex;gap:4px;flex-wrap:wrap}
+.selected-mini-actions .btn{padding:2px 6px;font-size:11px;min-width:26px;justify-content:center}
+body.note-dragging{overscroll-behavior:none;touch-action:none}
+/* 서명 모달 오픈 시 배경 스크롤/터치 출렁거림 완전 차단 */
+body.modal-open{overflow:hidden!important;touch-action:none!important}
+
+
+
+/* focus-selected-mode: 비활성 포스트잇 투명화 제거 —
+   모든 포스트잇 정상 표시, 선택된 것만 active 스타일(초록 테두리)로 구분.
+   pointer-events는 유지해 비활성 포스트잇도 클릭 가능하게. */
+body.focus-selected-mode .overlay .note.active{
+  z-index:80!important;
+}
+.focus-mode-hint{
+  display:none;
+  font-size:11px;
+  color:#166534;
+  background:#ecfdf5;
+  border:1px solid #bbf7d0;
+  border-radius:6px;
+  padding:3px 6px;
+  white-space:nowrap;
+}
+body.focus-selected-mode .focus-mode-hint{display:inline-flex}
+@media (max-width:760px){
+  body.check-align-mode .overlay .note:not(.active):not(.check){opacity:0.04!important}
+  body.check-align-mode .overlay .note.check:not(.active){opacity:0.18!important}
+}
+
+
+/* v33: 모바일/태블릿 레이아웃·스크롤·폭 제한 강화 */
+@media (max-width: 760px){
+  html,body{width:100%;max-width:100%;height:100dvh;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  .topbar{
+    width:100%;max-width:100vw;height:auto;min-height:52px;
+    flex-wrap:wrap;align-content:flex-start;align-items:flex-start;
+    gap:6px;padding:8px;overflow:hidden
+  }
+  .topbar-logo{font-size:14px;line-height:31px}
+  .topbar-sep{display:none}
+  .file-label{max-width:calc(100vw - 170px);font-size:12px;line-height:31px}
+  .topbar-right{
+    width:100%;max-width:calc(100vw - 16px);margin-left:0;display:flex;
+    flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;
+    padding:4px 0 6px;-webkit-overflow-scrolling:touch;scrollbar-width:thin
+  }
+  .topbar .btn,.topbar select,.jpg-page-buttons,.jpg-page-buttons .btn{flex:0 0 auto}
+  .jpg-page-buttons{max-width:none;flex-wrap:nowrap;overflow:visible}
+  .layout{flex:1;min-height:0;width:100%;max-width:100%;flex-direction:column;overflow:hidden}
+  .sidebar{
+    width:100%;max-width:100%;height:36dvh;min-height:220px;max-height:330px;
+    flex:0 0 auto;border-right:none;border-bottom:1px solid var(--border);overflow:hidden
+  }
+  .tabs{flex:0 0 auto;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+  .tab{flex:0 0 auto;min-width:96px;white-space:nowrap;font-size:12px;padding:10px 12px}
+  .tab-panel{padding:10px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .viewer-area{
+    flex:1;min-height:0;width:100%;max-width:100%;padding:12px;
+    overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain
+  }
+  .page-wrap{margin:0 auto 22px;max-width:none;width:max-content}
+  canvas.page-canvas{display:block;max-width:none}
+  .status-bar{flex:0 0 auto;max-width:100%;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .sign-modal{width:min(94vw,480px);padding:14px}
+  #signCanvas{width:100%;height:160px}
+}
+
+@media (max-width: 430px){
+  .sidebar{height:38dvh;min-height:230px;max-height:300px}
+  .btn{padding:5px 10px;font-size:12px}
+  .quick-row{padding:6px}
+  .quick-row label{min-width:78px}
+  .empty-hint{padding:26px 12px}
+}
+
+
+
+/* v34: 모바일 포스트잇 조작 안정화
+   - 터치 스크롤과 드래그 충돌 방지
+   - 모바일에서 핸들바/리사이즈 영역 확대
+*/
+.note-bar,.note-resize,.note-resize-w{
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+}
+.note.sign,.note.sign .note-body{
+  touch-action:none;
+}
+@media (max-width:760px){
+  .note-bar{
+    height:26px;
+    min-height:26px;
+    top:-26px;
+    padding:0 8px;
+    font-size:12px;
+  }
+  .note-bar::before{font-size:15px}
+  .note-bar-label{font-size:11px}
+  .note-del,.note-copy{
+    width:22px;
+    height:22px;
+    font-size:13px;
+  }
+  .note-resize,.note-resize-w{
+    width:20px;
+    height:20px;
+    right:-8px;
+    bottom:-8px;
+  }
+  .note-resize-w{
+    left:-8px;
+    right:auto;
+  }
+  .note-body{
+    min-height:24px;
+  }
+}
+
+
+/* v35: 모바일에서 PDF 렌더 배율이 줄어들 때 포스트잇 글자도 같은 비율로 작아지도록 보정 */
+.note.check .note-body{font-size:inherit!important}
+@media (max-width:760px){
+  .note-input{line-height:1.18}
+}
+
+
+
+/* ── 미리보기 모드 단일 정책 블록 ──────────────────────────────────────
+   분산 규칙 충돌 방지: 모든 preview-mode CSS를 여기 한 곳에만 정의한다.
+   border-width는 2px 유지(위치 고정), 색만 transparent로 처리한다. */
+
+/* 1. 모든 노트 타입 — 배경·테두리·그림자·아웃라인 완전 투명화
+   pointer-events:all 유지 — 미리보기에서도 선택·이동 가능해야 함
+   핸들바 등 UI만 숨기고 드래그는 허용 */
+body.preview-mode .overlay .note,
+body.preview-mode .overlay .note.active,
+body.preview-mode .overlay .note.sign,
+body.preview-mode .overlay .note.sign.active,
+body.preview-mode .overlay .note.check,
+body.preview-mode .overlay .note.check.active,
+body.preview-mode .overlay .note.empty,
+body.preview-mode .overlay .note:not(.empty):not(.check):not(.sign),
+body.preview-mode .overlay .note.empty:not(.check):not(.sign),
+body.preview-mode .overlay .note.active:not(.check):not(.sign),
+body.preview-mode.focus-selected-mode .overlay .note,
+body.preview-mode.check-align-mode .overlay .note{
+  background:transparent!important;
+  border:2px solid transparent!important;
+  box-shadow:none!important;
+  outline:none!important;
+  filter:none!important;
+  opacity:1!important;
+  pointer-events:all!important;
+  cursor:grab!important;
+}
+
+/* 2. UI 크롬 완전 제거 */
+body.preview-mode .overlay .note-bar,
+body.preview-mode .overlay .note-del,
+body.preview-mode .overlay .note-copy,
+body.preview-mode .overlay .note-resize,
+body.preview-mode .overlay .note-resize-w,
+body.preview-mode .overlay .note::after{
+  display:none!important;
+}
+
+/* 3. 텍스트·기호 표시 — 저장 결과와 동일하게 */
+/* note-body padding은 편집 모드와 동일하게 유지 — 미리보기에서 바꾸면
+   getNoteTextRect() DOM 실측값이 달라져 저장 좌표가 틀어진다 */
+/* note-body: padding 편집모드 동일 유지, 커서 grab 통일 */
+body.preview-mode .overlay .note .note-body{padding:2px 4px!important;cursor:grab!important}
+body.preview-mode .overlay .note.sign .note-body{padding:0!important;cursor:grab!important}
+/* 체크 정렬은 편집 모드(center)와 동일하게 유지 */
+body.preview-mode .overlay .note.check .note-body{
+  justify-content:center!important;align-items:center!important;cursor:grab!important}
+/* note-input: placeholder 색(연회색)을 진하게, 실제 값 색상은 inherit */
+body.preview-mode .overlay .note .note-input{outline:none!important;opacity:1!important;text-shadow:none!important;cursor:grab!important;user-select:none!important;-webkit-user-select:none!important;pointer-events:none!important}
+body.preview-mode .overlay .note .note-input[data-placeholder="1"]{color:#444!important}
+/* ───────────────────────────────────────────────────────────────────── */
+
+/* 편집 모드 — 텍스트 입력 중인 포스트잇 halo 강조
+   미리보기 모드에서는 적용 안 함 (box-shadow 변화로 저장 좌표 영향 없음) */
+body:not(.preview-mode) .overlay .note.active:focus-within{
+  box-shadow:0 0 0 4px rgba(34,197,94,0.35),2px 4px 14px rgba(0,0,0,.25)!important;
+}
+
+/* 미리보기 모드 — 빈 필드 hover 시에만 점선 외곽선 표시
+   border:transparent → border:dashed로 교체해 getNoteTextRect() 영향 없음
+   (요소 크기 변화 없이 색만 바뀜) */
+body.preview-mode .overlay .note.empty:hover{
+  border:2px dashed rgba(148,163,184,0.55)!important;
+}
+
+</style>
+</head>
+<body>
+
+<!-- 상단바 -->
+<div class="topbar">
+  <div class="topbar-logo">📝 서식 입력기</div>
+  <div class="topbar-sep"></div>
+  <div class="upload-btn btn">
+    📂 파일 열기
+    <input id="fileInput" type="file" accept="application/pdf,image/png,image/jpeg">
+  </div>
+  <span id="fileName" class="file-label">파일을 열어주세요</span>
+  <div class="topbar-right">
+    <button id="undoBtn" class="btn sm" title="실행 취소 (Ctrl+Z)" disabled>↩ 취소</button>
+    <button id="redoBtn" class="btn sm" title="다시 실행 (Ctrl+Y)" disabled>↪ 복원</button>
+    <button id="addTextBtn" class="btn sm">＋ 텍스트</button>
+    <button id="addCheckBtn" class="btn sm">＋ 체크</button>
+    <button id="addSignBtn" class="btn sm" style="background:#f0fdf4;border-color:#86efac;color:#166534">✍ 서명</button>
+    <button id="copySignBtn" class="btn sm" title="선택한 서명 또는 마지막 서명을 복사" style="background:#ecfdf5;border-color:#86efac;color:#166534">⧉ 서명복사</button>
+    <button id="previewModeBtn" class="btn sm" title="포스트잇 배경·테두리를 숨겨 저장 결과에 가깝게 확인">👁 미리보기</button>
+    <button id="clearValuesBtn" class="btn sm" title="입력값만 지우기 (필드 위치는 유지)">✕ 값 초기화</button>
+    <button id="clearAllBtn" class="btn sm danger" title="필드 전체 삭제">🗑 전체삭제</button>
+    <div class="topbar-sep"></div>
+    <button id="exportPdfBtn" class="btn accent">⬇ PDF 저장</button>
+    <select id="exportImgPageSelect" class="btn sm" title="JPG로 저장할 페이지 선택" style="display:none;height:31px;min-width:92px;padding:4px 8px">
+      <option value="all">JPG 전체</option>
+    </select>
+    <div id="jpgPageButtons" class="jpg-page-buttons" title="JPG 저장 대상"></div>
+    <button id="exportImgBtn" class="btn accent" style="background:#0891b2;border-color:#0891b2">⬇ JPG 저장</button>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div class="layout">
+
+  <!-- 사이드바 -->
+  <div class="sidebar">
+    <div class="tabs">
+      <div class="tab active" data-tab="input">✏️ 값 입력</div>
+      <div class="tab" data-tab="fields">🗂 필드 목록</div>
+      <div class="tab" data-tab="edit">⚙️ 상세 편집</div>
+      <div class="tab" data-tab="json">💾 저장</div>
+    </div>
+
+    <!-- 탭1: 값 입력 -->
+    <div class="tab-panel active" id="tab-input">
+      <div id="quickValues">
+        <div class="empty-hint">
+          <div class="icon">📄</div>
+          <div>파일을 열고 상단의 <b>＋텍스트</b>, <b>＋체크</b>, <b>✍ 서명</b>을 눌러<br>필드를 배치하세요</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 탭2: 필드 목록 -->
+    <div class="tab-panel" id="tab-fields">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--text-muted)">필드를 클릭해 선택·편집, ✕로 삭제</span>
+      </div>
+      <div id="fieldList">
+        <div class="empty-hint">
+          <div class="icon">🗂</div>
+          <div>필드가 없습니다</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 탭3: 상세 편집 -->
+    <div class="tab-panel" id="tab-edit">
+      <div id="editPanel">
+        <div class="no-field-msg">필드를 선택하면<br>여기서 상세 편집할 수 있습니다</div>
+      </div>
+    </div>
+
+    <!-- 탭4: 저장/불러오기 -->
+    <div class="tab-panel" id="tab-json">
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <!-- 저장 섹션 -->
+        <div class="json-section">
+          <div class="json-section-title">📥 저장하기</div>
+          <div class="json-desc">서식 위 노트 위치와 입력값을 JSON 파일로 저장합니다.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn sm accent" id="saveLayoutBtn">📐 위치만 저장</button>
+            <button class="btn sm accent" id="saveAllBtn">📝 위치+값 저장</button>
+          </div>
+          <div class="json-hint">위치만: 같은 서식 반복 사용 시 템플릿으로 재사용<br>위치+값: 작성 중 백업 / 이어서 작업</div>
+        </div>
+
+        <div class="json-divider"></div>
+
+        <!-- 불러오기 섹션 -->
+        <div class="json-section">
+          <div class="json-section-title">📤 불러오기</div>
+          <div class="json-desc">저장한 JSON 파일을 불러옵니다.</div>
+          <div class="upload-btn btn sm" style="align-self:flex-start">
+            📂 JSON 파일 선택
+            <input id="jsonFileInput" type="file" accept=".json,application/json">
+          </div>
+          <div id="jsonLoadPreview" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12px;margin-top:6px">
+            <div id="jsonPreviewText" style="color:var(--text-muted);margin-bottom:8px"></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn sm accent" id="loadLayoutOnlyBtn">📐 위치만 적용</button>
+              <button class="btn sm" id="loadAllBtn">📝 위치+값 적용</button>
+              <button class="btn sm danger" id="cancelLoadBtn">취소</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="json-divider"></div>
+
+        <!-- 브라우저 저장 -->
+        <div class="json-section">
+          <div class="json-section-title">🔖 브라우저 임시저장</div>
+          <div class="json-desc">브라우저를 닫아도 유지됩니다 (같은 브라우저에서만).</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn sm" id="browserSaveBtn">💾 임시저장</button>
+            <button class="btn sm" id="browserLoadBtn">📂 불러오기</button>
+            <button class="btn sm danger" id="browserClearBtn">🗑 삭제</button>
+          </div>
+          <div id="browserSaveInfo" style="font-size:11px;color:var(--text-light);margin-top:4px"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 상태바 -->
+    <div class="status-bar" id="statusBar">
+      <div class="status-line"><span id="statusText">준비</span></div>
+      <div id="selectedMiniBar" class="selected-mini hidden">
+        <div style="display:flex;gap:6px;align-items:center;min-width:0"><div id="selectedMiniInfo" class="selected-mini-info" style="flex:1;min-width:0"></div><span class="focus-mode-hint">선택 집중</span></div>
+        <div class="selected-mini-actions">
+          <button class="btn sm" id="miniNudgeLeft" title="왼쪽 1px / Shift 10px">←</button>
+          <button class="btn sm" id="miniNudgeUp" title="위 1px / Shift 10px">↑</button>
+          <button class="btn sm" id="miniNudgeDown" title="아래 1px / Shift 10px">↓</button>
+          <button class="btn sm" id="miniNudgeRight" title="오른쪽 1px / Shift 10px">→</button>
+          <button class="btn sm" id="miniDuplicate" title="선택 필드 복제">복제</button>
+          <button class="btn sm danger" id="miniDelete" title="선택 필드 삭제">삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 뷰어 -->
+  <div class="viewer-area" id="viewer">
+    <div class="welcome" id="welcomeMsg">
+      <div class="big-icon">📋</div>
+      <p>PDF나 이미지 서식을 열어서<br>텍스트를 입력하세요</p>
+      <div class="upload-btn btn w-btn accent">
+        📂 파일 열기
+        <input type="file" accept="application/pdf,image/png,image/jpeg"
+               onchange="document.getElementById('fileInput').files=this.files;document.getElementById('fileInput').dispatchEvent(new Event('change'))">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 좌표 디버그 옵션 (숨김, 우클릭 메뉴로 접근 가능) -->
+<div id="advModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>⚙️ 고급 설정</h3>
+    <div class="form-row">
+      <label>debug 표시</label>
+      <input id="debugToggle" type="checkbox"> <span style="font-size:12px;color:var(--text-muted)">필드 좌표 표시</span>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <label>빈값 표시</label>
+      <input id="placeholderToggle" type="checkbox" checked> <span style="font-size:12px;color:var(--text-muted)">빈 필드 라벨 표시</span>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <label>클릭배치</label>
+      <input id="clickPlaceToggle" type="checkbox" checked> <span style="font-size:12px;color:var(--text-muted)">선택 필드 클릭 위치 이동</span>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:6px">전체 이동 (오프셋 보정)</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="offsetX" type="number" value="0" step="1" style="width:70px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit" placeholder="X">
+      <input id="offsetY" type="number" value="0" step="1" style="width:70px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit" placeholder="Y">
+      <button class="btn sm" id="applyOffsetBtn">적용</button>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:6px">JSON 내보내기 / 불러오기</div>
+    <textarea id="jsonBox" style="width:100%;height:100px;border:1px solid var(--border);border-radius:6px;padding:6px;font:12px/1.4 monospace;resize:vertical" placeholder="좌표 JSON"></textarea>
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <button class="btn sm" id="loadJsonBtn">JSON 적용</button>
+      <button class="btn sm" id="downloadJsonBtn">JSON 다운로드</button>
+      <button class="btn sm" id="saveLocalBtn">브라우저 저장</button>
+      <button class="btn sm" id="loadLocalBtn">저장 불러오기</button>
+      <button class="btn sm" id="detectBtn">PDF 자동감지</button>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <label>PDF 기준선</label>
+      <input id="baseline" type="number" min="0" max="1.5" step="0.05" value="0.85" style="width:80px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit">
+    </div>
+    <div class="modal-btns" style="margin-top:12px">
+      <button class="btn" id="closeAdvModal">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 서명 모달 -->
+<div id="signModalBg" class="sign-modal-bg hidden">
+  <div class="sign-modal">
+    <h3>✍ 서명 추가</h3>
+    <div class="sign-tabs">
+      <button class="sign-tab active" data-stab="draw">🖊 직접 그리기</button>
+      <button class="sign-tab" data-stab="upload">📁 이미지 업로드</button>
+    </div>
+
+    <!-- 그리기 패널 -->
+    <div class="sign-panel active" id="stab-draw">
+      <div class="sign-canvas-wrap">
+        <canvas id="signCanvas" width="440" height="180"></canvas>
+        <div class="sign-hint" id="signHint">여기에 마우스로 서명하세요</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--text-muted)">색상</label>
+        <input type="color" id="signColor" value="#111111" style="width:36px;height:28px;border:1px solid var(--border);border-radius:5px;cursor:pointer;padding:2px">
+        <label style="font-size:12px;color:var(--text-muted)">굵기</label>
+        <input type="range" id="signWidth" min="1" max="8" value="2" style="width:80px">
+        <span id="signWidthVal" style="font-size:12px;color:var(--text-muted)">2px</span>
+        <button class="btn sm danger" id="signClearBtn" style="margin-left:auto">↺ 지우기</button>
+      </div>
+    </div>
+
+    <!-- 업로드 패널 -->
+    <div class="sign-panel" id="stab-upload">
+      <div style="border:2px dashed var(--border);border-radius:8px;padding:32px;text-align:center;cursor:pointer;background:#f8fafc" id="signDropZone">
+        <div style="font-size:32px;margin-bottom:8px">🖼</div>
+        <div style="font-size:13px;color:var(--text-muted)">PNG/JPG 서명 이미지를 끌어다 놓거나<br>클릭해서 선택하세요</div>
+        <input type="file" id="signImgInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none">
+      </div>
+      <div id="signImgPreview" style="display:none;margin-top:10px;text-align:center">
+        <img id="signPreviewImg" style="max-width:100%;max-height:160px;border-radius:6px;border:1px solid var(--border)">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn" id="signCancelBtn">취소</button>
+      <button class="btn accent" id="signInsertBtn">서명 삽입</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module">
+let pdfjsLib=null;
+async function ensurePdfJs(){
+  if(pdfjsLib)return pdfjsLib;
+  try{
+    pdfjsLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
+    if(pdfjsLib?.GlobalWorkerOptions){
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+    }
+    return pdfjsLib;
+  }catch(err){
+    console.error('pdf.js 로드 실패',err);
+    throw new Error('PDF.js 라이브러리를 불러오지 못했습니다. 모바일 WebView, file:// 실행, CDN 차단 또는 네트워크 제한 가능성이 있습니다.');
+  }
+}
+
+const $=id=>document.getElementById(id);
+const state={kind:null,fileName:'',bytes:null,pdf:null,imageBlob:null,pages:[],fields:[],selectedId:null,scale:1.35,suppressOverlayClickUntil:0,addMode:null,previewMode:false};
+
+// ── Undo/Redo 히스토리 ──────────────────────────────────────────────────
+const _history={undo:[],redo:[]};
+function snapshot(){
+  _history.undo.push(JSON.stringify(state.fields));
+  if(_history.undo.length>50)_history.undo.shift();
+  _history.redo.length=0;
+  updateUndoRedoBtns();
+}
+
+// ── 편집 Undo 묶음 처리 ──────────────────────────────────────────────────
+// input 이벤트마다 snapshot을 찍으면 히스토리가 글자 단위로 과적된다.
+// focus 시 시작값 보관 → blur/확정 시 변경이 있었을 때만 히스토리에 추가한다.
+let _editSnapshot=null;
+function beginEditSnapshot(){
+  // 이미 진행 중인 편집 세션이 있으면 덮어쓰지 않는다.
+  if(_editSnapshot===null)_editSnapshot=JSON.stringify(state.fields);
+}
+function commitEditSnapshot(){
+  if(_editSnapshot!==null){
+    const cur=JSON.stringify(state.fields);
+    if(_editSnapshot!==cur){
+      _history.undo.push(_editSnapshot);
+      if(_history.undo.length>50)_history.undo.shift();
+      _history.redo.length=0;
+      updateUndoRedoBtns();
+    }
+    _editSnapshot=null;
+  }
+}
+// ────────────────────────────────────────────────────────────────────────
+function undoAction(){
+  if(!_history.undo.length)return;
+  _history.redo.push(JSON.stringify(state.fields));
+  state.fields=JSON.parse(_history.undo.pop()).map(normalizeField);
+  state.selectedId=null;renderAll(false);log('실행 취소');
+  updateUndoRedoBtns();
+}
+function redoAction(){
+  if(!_history.redo.length)return;
+  _history.undo.push(JSON.stringify(state.fields));
+  state.fields=JSON.parse(_history.redo.pop()).map(normalizeField);
+  state.selectedId=null;renderAll(false);log('다시 실행');
+  updateUndoRedoBtns();
+}
+// ────────────────────────────────────────────────────────────────────────
+
+function uid(){return'f_'+Math.random().toString(36).slice(2,9)}
+function normalizeField(f){
+  return{id:f.id||uid(),key:f.key||'',label:f.label||'필드',type:f.type||'text',
+    page:Number(f.page||1),x:Number(f.x||40),y:Number(f.y||40),
+    w:f.w==null?0:Number(f.w),h:f.h==null?0:Number(f.h),
+    size:Number(f.size||13),scaleX:Number(f.scaleX||100),
+    color:f.color||'#111111',value:f.value||'',
+    imgData:f.imgData||'',  // base64 — sign 타입 전용
+    autoW:f.autoW===false?false:true,  // text 타입 자동 폭 계산. 리사이즈하면 false
+    group:f.group||'',groupKey:f.groupKey||'',groupVal:f.groupVal||''}
+}
+function dedupeFields(fields){
+  const seen=new Map();const out=[];
+  for(const raw of fields){
+    const f=normalizeField(raw);
+    // 서명 필드는 같은 label이 여러 개 존재할 수 있으므로 중복 병합 대상에서 제외
+    if(f.type==='sign'){out.push(f);continue}
+    const k=(f.key||f.label)+'|'+f.page+'|'+f.type;
+    if(seen.has(k)){const prev=seen.get(k);if(!prev.value&&f.value)Object.assign(prev,f,{id:prev.id});continue}
+    seen.set(k,f);out.push(f)
+  }return out
+}
+function log(msg){$('statusText').textContent=msg}
+function esc(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function selected(){return state.fields.find(f=>f.id===state.selectedId)}
+function isMobileViewport(){return window.matchMedia&&window.matchMedia('(max-width: 760px)').matches}
+function getRenderScaleForPage(page){
+  // PC는 기존 배율 유지, 모바일은 viewer 폭 기준으로 PDF 렌더 폭을 줄인다.
+  if(!isMobileViewport())return state.scale;
+  const raw=page.getViewport({scale:1});
+  const viewer=$('viewer');
+  const availableW=Math.max(280,(viewer?.clientWidth||window.innerWidth||360)-24);
+  return Math.min(1.10,Math.max(0.45,availableW/raw.width));
+}
+
+const BASE_RENDER_SCALE = 1.35;
+const BASE_TEXT_SIZE = 13;
+const BASE_CHECK_SIZE = 16;
+
+function getPageMeta(pageNo){
+  return state.pages.find(p=>Number(p.page)===Number(pageNo)) || state.pages[0] || null;
+}
+function getPageScale(pageNo){
+  const meta=getPageMeta(pageNo);
+  return Number(meta?.scale || state.scale || BASE_RENDER_SCALE);
+}
+function getDefaultFieldSize(type='text',pageNo=1){
+  // f.size는 화면 canvas 픽셀 기준이다.
+  // 모바일에서 PDF canvas 자체를 0.5~0.8배로 줄이면 기본 13px은 PDF 대비 과대해진다.
+  // 데스크톱 기준 1.35배 렌더에서의 13px/16px을 현재 페이지 scale에 맞춰 환산한다.
+  const base=type==='check'?BASE_CHECK_SIZE:BASE_TEXT_SIZE;
+  const scale=getPageScale(pageNo);
+  const size=Math.round(base*(scale/BASE_RENDER_SCALE));
+  const min=type==='check'?8:7;
+  const max=type==='check'?16:13;
+  return Math.max(min,Math.min(max,size));
+}
+function getTextAnchorOffsetY(){
+  // note-bar가 position:absolute로 note 위에 떠있으므로
+  // body(텍스트)는 note 최상단에서 시작 → 클릭 Y 보정값은 body top padding(2px)만
+  return 2;
+}
+
+// v38: 텍스트 필드 자동 폭 계산
+// 저장되는 텍스트 자체의 폭에 맞춰 포스트잇 폭을 조정한다.
+// 리사이즈 핸들로 폭을 직접 조정하면 autoW=false로 바뀌어 자동폭을 중단한다.
+let __measureCanvas=null;
+function measureTextPx(text,size=13,family="'Nanum Gothic','Malgun Gothic',system-ui,sans-serif"){
+  if(!__measureCanvas)__measureCanvas=document.createElement('canvas');
+  const ctx=__measureCanvas.getContext('2d');
+  ctx.font=`${size}px ${family}`;
+  return ctx.measureText(String(text||'')).width;
+}
+function getAutoTextWidth(f){
+  if(!f||f.type!=='text')return f?.w||120;
+  const raw=String(f.value||'');
+  const text=raw.trim()?raw:(f.label||'텍스트');
+  const lines=text.split(/\r?\n/);
+  const maxLine=lines.reduce((m,line)=>Math.max(m,measureTextPx(line,f.size||13)),0);
+  const scaleX=(Number(f.scaleX||100)/100);
+  const pad=isMobileViewport()?14:12;
+  const min=isMobileViewport()?38:50;
+  const page=getPageMeta(f.page);
+  const maxByPage=page?Math.max(min,(page.viewW||9999)-(f.x||0)-8):9999;
+  return Math.max(min,Math.min(Math.ceil(maxLine*scaleX+pad),maxByPage));
+}
+function shouldAutoFitText(f){
+  return !!(f&&f.type==='text'&&f.autoW!==false);
+}
+function autoFitTextField(f,el){
+  if(!shouldAutoFitText(f))return;
+  const w=getAutoTextWidth(f);
+  f.w=w;
+  if(el)el.style.width=w+'px';
+  const eW=document.getElementById('eW');
+  if(eW&&selected()?.id===f.id)eW.value=w;
+}
+
+
+// v36: JPG 저장 품질은 화면 표시 배율과 분리한다.
+// 모바일 화면용 PDF canvas는 작게 렌더링되므로, 그대로 JPG로 저장하면 원본 서식 글자가 뭉개진다.
+// 저장 시에는 PDF 페이지를 별도 고해상도 canvas로 다시 렌더링하고, 필드 좌표/글자크기만 비례 확대한다.
+function getJpgExportScale(meta){
+  if(state.kind!=='pdf')return Number(meta?.scale||state.scale||1);
+  // A4 기준 2.5배면 대략 1488×2105px로, 모바일에서도 실사용 가능한 품질과 메모리의 절충값이다.
+  // 너무 큰 PDF에서는 캔버스 픽셀 수를 제한해 구형 모바일 브라우저의 canvas 실패를 피한다.
+  const desired=isMobileViewport()?2.5:2.5;
+  const maxPixels=isMobileViewport()?9000000:16000000;
+  const rawW=Number(meta?.pdfW||595), rawH=Number(meta?.pdfH||842);
+  const maxScale=Math.sqrt(maxPixels/(rawW*rawH));
+  return Math.max(1.5,Math.min(desired,maxScale));
+}
+
+function getNoteBodyRect(f){
+  const p=getPageMeta(f.page); if(!p) return null;
+  const noteEl=p.overlay.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+  const bodyEl=noteEl?.querySelector('.note-body');
+  if(!noteEl||!bodyEl)return null;
+  const overlayRect=p.overlay.getBoundingClientRect();
+  const bodyRect=bodyEl.getBoundingClientRect();
+  return {
+    x:bodyRect.left-overlayRect.left,
+    y:bodyRect.top-overlayRect.top,
+    w:bodyRect.width,
+    h:bodyRect.height
+  };
+}
+
+function viewerMessage(icon,title,detail=''){
+  const v=$('viewer');
+  if(!v)return;
+  v.innerHTML=`<div class="welcome"><div class="big-icon">${icon}</div><p><b>${esc(title)}</b>${detail?'<br><br>'+detail:''}</p></div>`;
+}
+function formatErr(err){
+  return esc(String(err?.message||err||'알 수 없는 오류'));
+}
+
+
+// ── 탭 전환 ──
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    $('tab-'+tab.dataset.tab).classList.add('active');
+    updateFocusModeBySelection();
+  })
+});
+
+// ── 파일 업로드 ──
+// ── 파일 로드 공통 함수 (fileInput change + viewer drag&drop 공유) ──
+async function loadFile(file){
+  if(!file)return;
+  const isValid=file.type==='application/pdf'||file.type.startsWith('image/');
+  if(!isValid)return alert('PDF 또는 이미지 파일(PNG, JPG)만 지원합니다.');
+  const keepFields=state.fields.length>0&&confirm('기존 입력값/필드를 유지할까요?\n(취소하면 초기화됩니다)');
+  const savedFields=keepFields?[...state.fields]:[];
+
+  state.kind=file.type==='application/pdf'?'pdf':'image';
+  state.fileName=file.name;
+  state.fields=savedFields;state.selectedId=null;state.pages=[];state.pdf=null;state.imageBlob=null;
+  $('fileName').textContent=file.name;
+  viewerMessage('⏳','파일을 불러오는 중입니다.','모바일에서는 PDF 렌더링에 시간이 걸릴 수 있습니다.');
+  log('파일 로드 중...');
+
+  try{
+    state.bytes=await file.arrayBuffer();
+    // 폰트 로드를 PDF/이미지 렌더링과 병렬로 시작한다.
+    // 렌더링이 끝난 시점에 이미 로드가 완료되어 있으면 대기 시간 0.
+    // renderAll 내 autoW(자동 폭 계산)가 미로드 폰트로 오계산되는 것을 방지한다.
+    const fontReady=document.fonts.load("13px 'Nanum Gothic'").catch(()=>{});
+    if(state.kind==='pdf')await renderPdf();
+    else await renderImage(file);
+    updateJpgPageSelect();
+    await fontReady; // PDF 렌더 중 폰트가 이미 로드됐으면 즉시 통과
+    renderAll(false);
+    log(`${file.name} 로드 완료`);
+  }catch(err){
+    console.error(err);
+    state.pages=[];state.pdf=null;
+    updateJpgPageSelect?.();
+    const detail=`오류: ${formatErr(err)}<br><br>대응: Chrome/삼성인터넷에서 다시 열거나, 외부 CDN이 차단되는 환경이면 pdf.js/pdf.worker를 로컬 파일로 포함해야 합니다.`;
+    viewerMessage('⚠️','PDF를 불러오지 못했습니다.',detail);
+    log('PDF 로드 실패');
+  }
+}
+
+$('fileInput').addEventListener('change',async e=>{
+  await loadFile(e.target.files[0]);
+  e.target.value=''; // 같은 파일 재선택 허용
+});
+
+// 뷰어 전역 Drag & Drop — 파일을 화면 어디서든 끌어다 놓으면 열림
+{
+  const viewer=$('viewer');
+  // dragenter/leave 시 시각 피드백
+  let _dragCount=0;
+  viewer.addEventListener('dragenter',e=>{
+    e.preventDefault();_dragCount++;
+    viewer.style.outline='3px dashed var(--accent)';
+    viewer.style.outlineOffset='-6px';
+  });
+  viewer.addEventListener('dragleave',()=>{
+    _dragCount--;
+    if(_dragCount<=0){_dragCount=0;viewer.style.outline='';viewer.style.outlineOffset='';}
+  });
+  viewer.addEventListener('dragover',e=>e.preventDefault());
+  viewer.addEventListener('drop',async e=>{
+    e.preventDefault();_dragCount=0;
+    viewer.style.outline='';viewer.style.outlineOffset='';
+    const file=e.dataTransfer.files[0];
+    if(file)await loadFile(file);
+  });
+}
+
+// ── PDF 렌더 ──
+async function renderPdf(){
+  const pdfjs=await ensurePdfJs();
+  $('viewer').innerHTML='';
+
+  let loadingTask=null;
+  try{
+    loadingTask=pdfjs.getDocument({data:state.bytes.slice(0)});
+    state.pdf=await loadingTask.promise;
+  }catch(e){
+    console.warn('PDF worker 방식 실패, disableWorker로 재시도',e);
+    try{
+      loadingTask=pdfjs.getDocument({data:state.bytes.slice(0),disableWorker:true});
+      state.pdf=await loadingTask.promise;
+    }catch(e2){
+      throw new Error('PDF 파싱/렌더링 실패: '+String(e2?.message||e2));
+    }
+  }
+
+  for(let i=1;i<=state.pdf.numPages;i++){
+    log(`PDF 렌더링 중... ${i}/${state.pdf.numPages}쪽`);
+    const page=await state.pdf.getPage(i);
+    const scale=getRenderScaleForPage(page);
+    const viewport=page.getViewport({scale});
+    const wrap=document.createElement('div');wrap.className='page-wrap';wrap.dataset.page=i;
+    const lbl=document.createElement('div');lbl.className='page-label';lbl.textContent=i+'쪽';
+    const canvas=document.createElement('canvas');canvas.className='page-canvas';
+    canvas.width=Math.floor(viewport.width);canvas.height=Math.floor(viewport.height);
+    const ctx=canvas.getContext('2d',{alpha:false});
+    await page.render({canvasContext:ctx,viewport}).promise;
+    const overlay=document.createElement('div');overlay.className='overlay';
+    wrap.append(lbl,canvas,overlay);installOverlayClick(overlay,i);
+    $('viewer').appendChild(wrap);
+    const raw=page.getViewport({scale:1});
+    state.pages.push({page:i,wrap,canvas,overlay,pdfW:raw.width,pdfH:raw.height,viewW:canvas.width,viewH:canvas.height,scale});
+    await new Promise(r=>setTimeout(r,0));
+  }
+}
+async function renderImage(file){
+  const url=URL.createObjectURL(file);
+  try{const img=new Image();img.src=url;await img.decode();
+  const viewer=$('viewer');
+  const maxW=isMobileViewport()?Math.max(280,(viewer?.clientWidth||window.innerWidth||360)-24):1000;
+  const ratio=img.width>maxW?maxW/img.width:1;
+  const wrap=document.createElement('div');wrap.className='page-wrap';wrap.dataset.page=1;
+  const lbl=document.createElement('div');lbl.className='page-label';lbl.textContent='1쪽';
+  const canvas=document.createElement('canvas');canvas.className='page-canvas';
+  canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);
+  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  const overlay=document.createElement('div');overlay.className='overlay';
+  wrap.append(lbl,canvas,overlay);installOverlayClick(overlay,1);
+  $('viewer').appendChild(wrap);
+  state.imageBlob=file;
+  state.pages.push({page:1,wrap,canvas,overlay,pdfW:canvas.width,pdfH:canvas.height,viewW:canvas.width,viewH:canvas.height,imgW:img.width,imgH:img.height,scale:ratio});
+  }finally{URL.revokeObjectURL(url);}
+}
+
+function updateJpgPageSelect(){
+  const sel=$('exportImgPageSelect');if(!sel)return;
+  const prev=sel.value||'visible';
+  sel.innerHTML='<option value="visible">현재 보이는 쪽</option><option value="selected">선택 필드 쪽</option><option value="all">전체 ZIP</option>';
+  state.pages.forEach(p=>{
+    const opt=document.createElement('option');
+    opt.value=String(p.page);opt.textContent=p.page+'쪽만';sel.appendChild(opt);
+  });
+  sel.value=[...sel.options].some(o=>o.value===prev)?prev:'visible';
+  updateJpgPageButtons();
+}
+
+function getMostVisiblePage(){
+  const viewer=$('viewer');
+  if(!viewer||!state.pages.length)return state.pages[0]||null;
+  const vr=viewer.getBoundingClientRect();
+  let best=null,bestArea=-1;
+  state.pages.forEach(p=>{
+    const r=p.wrap.getBoundingClientRect();
+    const left=Math.max(r.left,vr.left),right=Math.min(r.right,vr.right);
+    const top=Math.max(r.top,vr.top),bottom=Math.min(r.bottom,vr.bottom);
+    const area=Math.max(0,right-left)*Math.max(0,bottom-top);
+    if(area>bestArea){bestArea=area;best=p;}
+  });
+  return best||state.pages[0]||null;
+}
+
+function updateJpgPageButtons(){
+  const box=$('jpgPageButtons');
+  const sel=$('exportImgPageSelect');
+  if(!box||!sel)return;
+  const mode=sel.value||'visible';
+  box.innerHTML='';
+  const items=[
+    ['visible','현재쪽'],
+    ['selected','선택쪽'],
+    ...state.pages.map(p=>[String(p.page),p.page+'쪽']),
+    ['all','전체ZIP']
+  ];
+  items.forEach(([val,label])=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='btn sm'+(mode===val?' active':'');
+    b.textContent=label;
+    b.onclick=()=>{sel.value=val;updateJpgPageButtons();log('JPG 저장 대상: '+label)};
+    box.appendChild(b);
+  });
+}
+
+function getDefaultInsertPosition(w=160,h=70){
+  const viewer=$('viewer');
+  const vr=viewer.getBoundingClientRect();
+  const selectedField=selected();
+  if(selectedField&&state.pages[selectedField.page-1]){
+    return{page:selectedField.page,x:Math.max(0,selectedField.x+20),y:Math.max(0,selectedField.y+20)};
+  }
+  let best=null,bestArea=-1;
+  state.pages.forEach(p=>{
+    const r=p.wrap.getBoundingClientRect();
+    const left=Math.max(r.left,vr.left),right=Math.min(r.right,vr.right);
+    const top=Math.max(r.top,vr.top),bottom=Math.min(r.bottom,vr.bottom);
+    const area=Math.max(0,right-left)*Math.max(0,bottom-top);
+    if(area>bestArea){bestArea=area;best=p;}
+  });
+  const p=best||state.pages[0];
+  if(!p)return{page:1,x:60,y:60};
+  const or=p.overlay.getBoundingClientRect();
+  const cx=Math.min(Math.max(vr.left+vr.width/2,or.left),or.right);
+  const cy=Math.min(Math.max(vr.top+vr.height/2,or.top),or.bottom);
+  return{page:p.page,x:Math.max(0,Math.round(cx-or.left-w/2)),y:Math.max(0,Math.round(cy-or.top-h/2))};
+}
+
+
+function findReusableSignField(){
+  // 우선순위: 선택된 서명 → 마지막으로 생성된 서명 이미지
+  const cur=selected();
+  if(cur&&cur.type==='sign'&&cur.imgData)return cur;
+  for(let i=state.fields.length-1;i>=0;i--){
+    const f=state.fields[i];
+    if(f.type==='sign'&&f.imgData)return f;
+  }
+  return null;
+}
+
+function copySignField(src){
+  if(!state.pages.length)return alert('파일을 먼저 열어주세요.');
+  const base=(src&&src.type==='sign'&&src.imgData)?src:findReusableSignField();
+  if(!base)return alert('복사할 서명이 없습니다. 먼저 서명을 하나 추가하세요.');
+  const w=base.w||160, h=base.h||70;
+  let pos;
+  if(base.page&&state.pages[base.page-1]){
+    const p=state.pages[base.page-1];
+    const maxX=Math.max(0,(p.viewW||9999)-w-4);
+    const maxY=Math.max(0,(p.viewH||9999)-h-4);
+    pos={page:base.page,x:Math.min(maxX,Math.max(0,(base.x||0)+24)),y:Math.min(maxY,Math.max(0,(base.y||0)+24))};
+  } else {
+    pos=getDefaultInsertPosition(w,h);
+  }
+  const dup=normalizeField({...base,id:undefined,label:base.label||'서명',type:'sign',value:'sign',page:pos.page,x:pos.x,y:pos.y,w,h,size:base.size||13,imgData:base.imgData});
+  snapshot();
+  state.fields.push(dup);
+  state.selectedId=dup.id;
+  renderAll(false);
+  scrollToField(dup);
+  log(`서명 복사 완료 → ${dup.page}쪽 x:${dup.x} y:${dup.y}`);
+}
+
+
+function findPageByClientPoint(clientX,clientY){
+  // 화면상 좌표가 들어간 실제 페이지 overlay를 찾는다.
+  // 페이지 밖이면 가장 가까운 페이지를 반환해 드래그 종료 시 페이지가 고정되지 않게 한다.
+  let nearest=null,nearestDist=Infinity;
+  for(const p of state.pages){
+    const r=p.overlay.getBoundingClientRect();
+    if(clientX>=r.left&&clientX<=r.right&&clientY>=r.top&&clientY<=r.bottom)return p;
+    const cx=Math.max(r.left,Math.min(clientX,r.right));
+    const cy=Math.max(r.top, Math.min(clientY,r.bottom));
+    const d=Math.hypot(clientX-cx,clientY-cy);
+    if(d<nearestDist){nearestDist=d;nearest=p;}
+  }
+  return nearest||state.pages[0]||null;
+}
+
+function rebaseFieldToVisualPage(f,el){
+  // 기존 구현은 f.page는 그대로 두고 f.x/f.y만 키웠기 때문에
+  // 1쪽 소속 노트를 3쪽까지 끌면 y=3000대가 되고 페이지값은 1로 남았다.
+  // 여기서는 노트의 실제 화면 중심 기준으로 소속 페이지를 다시 계산한다.
+  if(!f||!el||!state.pages.length)return false;
+  const nr=el.getBoundingClientRect();
+  const centerX=nr.left+nr.width/2;
+  const centerY=nr.top+nr.height/2;
+  const target=findPageByClientPoint(centerX,centerY);
+  if(!target)return false;
+  const tr=target.overlay.getBoundingClientRect();
+  const newX=Math.max(0,Math.round(nr.left-tr.left));
+  const newY=Math.max(0,Math.round(nr.top -tr.top));
+  const changed=f.page!==target.page||f.x!==newX||f.y!==newY;
+  f.page=target.page;f.x=newX;f.y=newY;
+  return changed;
+}
+
+function suppressOverlayClick(ms=450){
+  state.suppressOverlayClickUntil=Date.now()+ms;
+}
+function isOverlayClickSuppressed(){
+  return Date.now()<state.suppressOverlayClickUntil;
+}
+function bindNoteEventGuards(el){
+  // pointerdown은 차단하지 않는다. 차단하면 선택·드래그·텍스트 포커스가 같이 죽는다.
+  // 여기서는 overlay의 "빈 곳 클릭 → 새 노트 생성"만 잠시 억제한다.
+  el.addEventListener('pointerdown',()=>{suppressOverlayClick(500)},true);
+  el.addEventListener('click',ev=>{
+    suppressOverlayClick(400);
+    ev.stopPropagation();
+  });
+}
+function setNoteInputVisual(inp,f){
+  if(!inp)return;
+  if(f.value){
+    inp.textContent=f.value;
+    delete inp.dataset.placeholder;
+    inp.style.color=f.color||'#111111';
+  }else if(f.type==='check'){
+    inp.textContent='□';
+    inp.dataset.placeholder='1';
+    inp.style.color='#94a3b8';
+  }else{
+    inp.textContent=f.label||'텍스트';
+    inp.dataset.placeholder='1';
+    inp.style.color='#94a3b8';
+  }
+  const noteEl=inp.closest('.note');
+  if(noteEl)noteEl.classList.toggle('empty',!f.value);
+}
+function setupTextPlaceholder(inp,f){
+  if(!inp||f.type!=='text')return;
+  function clearPlaceholder(){
+    if(inp.dataset.placeholder==='1'&&!f.value){
+      inp.textContent='';
+      delete inp.dataset.placeholder;
+      inp.style.color=f.color||'#111111';
+    }
+  }
+  function showPlaceholder(){
+    if(!f.value)setNoteInputVisual(inp,f);
+  }
+  inp.addEventListener('focus',()=>{
+    suppressOverlayClick(500);
+    selectField(f.id,true);
+    clearPlaceholder();
+    beginEditSnapshot(); // 텍스트 입력 시작 전 상태 보관
+  });
+  inp.addEventListener('pointerdown',ev=>{
+    suppressOverlayClick(500);
+    // 미리보기 모드: stopPropagation 하지 않아 부모 .note의 드래그 로직으로 이벤트 전달
+    // 편집 모드: 텍스트 편집 포커스를 위해 전파 차단 (preventDefault는 금지)
+    if(state.previewMode) return;
+    ev.stopPropagation();
+  });
+  inp.addEventListener('click',ev=>{
+    suppressOverlayClick(400);
+    if(state.previewMode) return;
+    ev.stopPropagation();
+  });
+  inp.addEventListener('blur',()=>{
+    commitEditSnapshot(); // 변경이 있었을 때만 히스토리 추가
+    showPlaceholder();
+  });
+}
+
+function updateAddModeUi(){
+  document.body.classList.toggle('add-mode',!!state.addMode);
+  const textBtn=$('addTextBtn'), checkBtn=$('addCheckBtn');
+  if(textBtn)textBtn.classList.toggle('mode-active',state.addMode==='text');
+  if(checkBtn)checkBtn.classList.toggle('mode-active',state.addMode==='check');
+  state.pages.forEach(p=>{
+    if(p.overlay)p.overlay.title=state.addMode?((state.addMode==='check'?'체크':'텍스트')+' 추가 위치를 클릭하세요'):'추가 버튼을 먼저 누른 뒤 위치를 클릭하세요';
+  });
+}
+function setAddMode(mode){
+  if(!state.pages.length){alert('파일을 먼저 열어주세요.');return;}
+  state.addMode=state.addMode===mode?null:mode;
+  updateAddModeUi();
+  log(state.addMode?(state.addMode==='check'?'체크':'텍스트')+' 추가 모드 — PDF에서 위치를 클릭하세요':'추가 모드 해제');
+}
+function clearAddMode(){
+  if(!state.addMode)return;
+  state.addMode=null;updateAddModeUi();log('추가 모드 해제');
+}
+function duplicateSelectedField(){
+  const f=selected();if(!f)return;
+  snapshot();
+  const copy=normalizeField({...f,id:undefined,x:f.x+24,y:f.y+24,value:f.value,imgData:f.imgData});
+  state.fields.push(copy);state.selectedId=copy.id;renderAll(false);scrollToField(copy);log('선택 필드 복제 완료');
+}
+function nudgeSelected(dx,dy,step=1){
+  const f=selected();if(!f)return;
+  snapshot();
+  f.x=Math.max(0,Math.round(f.x+dx*step));
+  f.y=Math.max(0,Math.round(f.y+dy*step));
+  const el=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+  if(el){el.style.left=f.x+'px';el.style.top=f.y+'px';el.dataset.pos=`p${f.page} x:${f.x} y:${f.y}`;}
+  renderFieldList();renderEditPanel();updateSelectedMiniBar();syncJson();
+}
+function updateSelectedMiniBar(){
+  const bar=$('selectedMiniBar'),info=$('selectedMiniInfo');
+  if(!bar||!info)return;
+  const f=selected();
+  if(!f){bar.classList.add('hidden');return;}
+  bar.classList.remove('hidden');
+  const type=f.type==='sign'?'서명':(f.type==='check'?'체크':'텍스트');
+  const wh=f.type==='sign'?` · W ${Math.round(f.w||160)} / H ${Math.round(f.h||70)}`:(f.w?` · W ${Math.round(f.w)}`:'');
+  info.textContent=`선택: ${type} · ${f.page}쪽 · X ${Math.round(f.x)} / Y ${Math.round(f.y)}${wh}`;
+}
+function deleteSelectedField(){
+  const f=selected();if(!f)return;
+  snapshot();state.fields=state.fields.filter(x=>x.id!==f.id);state.selectedId=null;renderAll(false);log('선택 필드 삭제');
+}
+function setPreviewMode(on){
+  state.previewMode=!!on;
+  document.body.classList.toggle('preview-mode',state.previewMode);
+  const btn=$('previewModeBtn');if(btn)btn.classList.toggle('preview-active',state.previewMode);
+  // 미리보기에서는 note-input contentEditable을 끔
+  // → 체크/텍스트 노트 클릭이 el(div.note)로 버블링 → onDown → selectField 정상 동작
+  // 편집 모드 복귀 시 다시 켬
+  document.querySelectorAll('.note-input').forEach(inp=>{
+    inp.contentEditable = state.previewMode ? 'false' : 'true';
+  });
+  updateFocusModeBySelection();
+  log(state.previewMode?'미리보기 모드 — 포스트잇 배경/테두리 숨김':'편집 모드');
+}
+function getActiveTabName(){
+  return document.querySelector('.tab.active')?.dataset.tab || '';
+}
+function updateFocusModeBySelection(){
+  const tabName=getActiveTabName();
+  const f=selected();
+  // 필드 목록 탭에서 선택된 필드가 있을 때만 집중 모드 적용.
+  // 값 입력/상세 편집/저장 탭에서는 전체 필드를 정상 표시한다.
+  const focusOn=tabName==='fields' && !!f && !state.previewMode;
+  document.body.classList.toggle('focus-selected-mode',focusOn);
+  document.body.classList.toggle('check-align-mode',focusOn && f?.type==='check');
+}
+
+const TEXT_NOTE_ANCHOR_OFFSET_X = 4;   // .note-body 좌측 padding
+// TEXT_NOTE_ANCHOR_OFFSET_Y는 모바일 note-bar 확대를 반영해야 하므로 getTextAnchorOffsetY() 사용
+
+function installOverlayClick(overlay,pageNo){
+  // v30: 빈 곳 클릭은 명시적 추가 모드에서만 새 노트를 만든다.
+  // 노트 편집/드래그 중 우발적 click으로 새 포스트잇이 생기는 문제를 구조적으로 차단한다.
+  overlay.addEventListener('click',ev=>{
+    if(isOverlayClickSuppressed()){
+      ev.preventDefault();
+      ev.stopPropagation();
+      return;
+    }
+    if(ev.target!==overlay)return;
+    if(!state.addMode){
+      // 빈 곳 클릭 → 현재 선택 해제
+      if(state.selectedId){
+        state.selectedId=null;
+        renderAll(false);
+      }
+      return;
+    }
+    const r=overlay.getBoundingClientRect();
+    const clickX=Math.round(ev.clientX-r.left);
+    const clickY=Math.round(ev.clientY-r.top);
+    let f;
+    if(state.addMode==='check'){
+      f=normalizeField({type:'check',label:'체크',value:'✓',page:pageNo,x:Math.max(0,clickX-8),y:Math.max(0,clickY-getTextAnchorOffsetY()),size:getDefaultFieldSize('check',pageNo),w:24});
+    }else{
+      const x=Math.max(0,clickX-TEXT_NOTE_ANCHOR_OFFSET_X);
+      const y=Math.max(0,clickY-getTextAnchorOffsetY());
+      f=normalizeField({type:'text',label:'텍스트',value:'',page:pageNo,x,y,size:getDefaultFieldSize('text',pageNo),w:120});
+    }
+    snapshot();state.fields.push(f);state.selectedId=f.id;
+    state.addMode=null;
+    renderAll(false);updateAddModeUi();
+    log(`새 ${f.type==='check'?'체크':'텍스트'} 추가 → ${pageNo}쪽 기준 x:${clickX} y:${clickY}`);
+  })
+}
+
+// ── renderAll ──
+// 입력 중 포커스를 유지하기 위해 quickValues는 전체 재빌드 vs 값만 동기화를 구분
+function renderAll(skipQuickRebuild=false){
+  document.body.classList.toggle('debug',$('debugToggle').checked);
+  renderStamps();
+  if(skipQuickRebuild) syncQuickValues(); else buildQuickValues();
+  renderFieldList();renderEditPanel();syncJson();updateSelectedMiniBar();updateAddModeUi();updateJpgPageButtons()
+}
+
+// ── 포스트잇 노트 렌더 ──
+function renderStamps(){
+  // 전역 드래그 핸들러 맵 초기화 — 재렌더 전 이전 노트 핸들러 제거
+  _noteDragHandlers.clear();
+  state.pages.forEach(p=>p.overlay.innerHTML='');
+  state.fields.forEach(f=>{
+    const p=state.pages[f.page-1];if(!p)return;
+    const el=buildNote(f);
+    p.overlay.appendChild(el)
+  })
+}
+
+function buildNote(f){
+  const has=f.type==='sign'?!!f.imgData:(f.value.length>0);
+  const isActive=f.id===state.selectedId;
+
+  const el=document.createElement('div');
+  el.className='note'+(f.type==='check'?' check':'')+(f.type==='sign'?' sign':'')+(has?'':' empty')+(isActive?' active':'');
+  el.dataset.id=f.id;
+  el.dataset.pos=`p${f.page} x:${f.x} y:${f.y}`;
+  const h=f.h>0?f.h:80;
+  if(shouldAutoFitText(f)) f.w=getAutoTextWidth(f);
+  el.style.cssText=`left:${f.x}px;top:${f.y}px;font-size:${f.size}px;color:${f.color||'#111'};width:${f.w>0?f.w+'px':'120px'};min-width:${f.type==='check'?'24px':'60px'};${f.type==='sign'?`height:${h}px`:''}`
+
+  // 핸들바 (드래그용)
+  const bar=document.createElement('div');bar.className='note-bar';
+  const barLabel=document.createElement('span');barLabel.className='note-bar-label';barLabel.textContent=f.label;
+  const delBtn=document.createElement('button');delBtn.className='note-del';delBtn.textContent='✕';delBtn.title='삭제';
+  delBtn.onpointerdown=ev=>{suppressOverlayClick(500);ev.stopPropagation()};
+  delBtn.onclick=ev=>{suppressOverlayClick(500);ev.stopPropagation();
+    snapshot();
+    if(state.selectedId===f.id)state.selectedId=null;
+    state.fields=state.fields.filter(x=>x.id!==f.id);renderAll(false)};
+  bar.append(barLabel);
+  if(f.type==='sign'){
+    const copyBtn=document.createElement('button');
+    copyBtn.className='note-copy';copyBtn.textContent='⧉';copyBtn.title='서명 복사';
+    copyBtn.onpointerdown=ev=>{suppressOverlayClick(500);ev.stopPropagation()};
+    copyBtn.onclick=ev=>{suppressOverlayClick(500);ev.stopPropagation();copySignField(f)};
+    bar.append(copyBtn);
+  }
+  bar.append(delBtn);
+
+  // 본문
+  const body=document.createElement('div');body.className='note-body';
+  let inp=null;
+  if(f.type==='sign'){
+    // 서명 타입 — img 태그로 표시
+    if(f.imgData){
+      const img=document.createElement('img');
+      img.src=f.imgData;img.draggable=false;
+      img.style.cssText='width:100%;height:100%;object-fit:contain;display:block;pointer-events:none';
+      body.appendChild(img);
+    } else {
+      const ph=document.createElement('span');
+      ph.style.cssText='font-size:11px;color:#555;padding:4px;display:block;text-shadow:0 0 3px #fff,0 0 4px #fff';
+      ph.textContent='서명 없음';body.appendChild(ph);
+    }
+    // 더블클릭: 이미 선택(활성)된 상태에서만 서명 모달 열기
+    // body가 아닌 el에 달아야 click stopPropagation의 영향을 안 받음
+    el.addEventListener('dblclick',ev=>{
+      ev.stopPropagation();
+      if(state.selectedId===f.id) openSignModal(f);
+    });
+  } else {
+    inp=document.createElement('span');inp.className='note-input';
+    inp.contentEditable=state.previewMode?'false':'true';inp.spellcheck=false;
+    setNoteInputVisual(inp,f);
+    if(f.type==='text')setupTextPlaceholder(inp,f);
+    else inp.addEventListener('focus',()=>{suppressOverlayClick(500);selectField(f.id,true)});
+    // Enter 키: 브라우저 기본 <div>/<br> 삽입 대신 \n 직접 삽입
+    // 붙여넣기: 텍스트 타입만 plain text 삽입 — 체크는 기호 선택 전용이라 제외
+    if(f.type==='text'){
+      inp.addEventListener('paste',ev=>{
+        ev.preventDefault();
+        const text=(ev.clipboardData||window.clipboardData).getData('text/plain');
+        if(!text)return;
+        const sel=window.getSelection();
+        if(!sel||!sel.rangeCount)return;
+        const range=sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        range.collapse(false);
+        sel.removeAllRanges();sel.addRange(range);
+        inp.dispatchEvent(new Event('input',{bubbles:true}));
+      });
+    } else {
+      // 체크 필드: 붙여넣기 자체를 차단 (기호 picker로만 입력)
+      inp.addEventListener('paste',ev=>ev.preventDefault());
+    }
+    inp.addEventListener('keydown',ev=>{
+      if(ev.key!=='Enter')return;
+      ev.preventDefault();
+      const sel=window.getSelection();
+      if(sel&&sel.rangeCount>0){
+        const range=sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode('\n'));
+        range.collapse(false);
+        sel.removeAllRanges();sel.addRange(range);
+      } else {
+        // 모바일 가상 키보드 등 Selection 유실 시 폴백 — 끝에 개행 추가
+        inp.textContent=(inp.textContent||'')+'\n';
+      }
+      inp.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    inp.addEventListener('input',()=>{
+      if(inp.dataset.placeholder==='1')return;
+      // innerText: 브라우저가 <div><br> 등을 삽입하면 \n\n이 될 수 있음
+      // → textContent 기반으로 읽되, 끝 개행만 제거
+      f.value=(inp.textContent||'').replace(/\u00a0/g,' ').replace(/\n+$/,'');
+      inp.style.color=f.value?f.color:'#94a3b8';
+      const noteEl=inp.closest('.note');
+      if(noteEl){
+        noteEl.classList.toggle('empty',!f.value);
+        autoFitTextField(f,noteEl);
+      }
+      const qv=document.querySelector(`input[data-fid="${CSS.escape(f.id)}"]`);
+      if(qv)qv.value=f.value;
+      const row=qv?.closest('.quick-row');
+      if(row)row.classList.toggle('has-value',!!f.value);
+      syncJson();
+    });
+    body.appendChild(inp);
+  }
+
+  // 우하단 리사이즈 (너비)
+  const rh=document.createElement('div');rh.className='note-resize';rh.title='너비 조절';
+  installResize(rh,f,el,'width');
+
+  // 좌하단 리사이즈 (글자크기)
+  const rh2=document.createElement('div');rh2.className='note-resize-w';rh2.title='글자크기 조절';
+  installResize(rh2,f,el,'font');
+
+  el.append(bar,body,rh,rh2);
+  bindNoteEventGuards(el);
+  installNoteDrag(el,bar,body,f);
+  return el
+}
+
+// ── 전역 단일 드래그 핸들러 ──────────────────────────────────────────────
+// 노트마다 document에 pointermove/pointerup 리스너를 중복 등록하면
+// 필드 수만큼 이벤트 호출이 쌓여 모바일에서 심각한 성능 저하가 발생한다.
+// 전역 Map에 핸들러를 등록하고 document 레벨에서는 단 1회만 바인딩한다.
+const _noteDragHandlers = new Map(); // el → {onMove, onUp}
+document.addEventListener('pointermove', ev=>{
+  for(const {onMove} of _noteDragHandlers.values()) onMove(ev);
+},{passive:false});
+document.addEventListener('pointerup', ev=>{
+  for(const {onUp} of _noteDragHandlers.values()) onUp(ev);
+});
+document.addEventListener('pointercancel', ev=>{
+  for(const {onUp} of _noteDragHandlers.values()) onUp(ev);
+});
+
+function installNoteDrag(el,bar,body,f){
+  let active=false;   // pointerdown 후 활성
+  let dragging=false; // threshold 넘어 실제 이동 중
+  let pid=-1;         // pointerId
+  let sx=0,sy=0,ox=0,oy=0;
+  const THRESHOLD=4;
+  const inp=body.querySelector('.note-input');
+
+  function onDown(ev){
+    suppressOverlayClick(500);
+    if(ev.target.classList.contains('note-del'))return;
+    if(ev.target.classList.contains('note-resize'))return;
+    if(ev.target.classList.contains('note-resize-w'))return;
+    // ev.button: 마우스는 0=좌클릭, 터치/펜 포인터는 -1 또는 0 반환 — 0이 아닌 양수만 차단(우클릭/중간클릭)
+    if(ev.button!==undefined&&ev.button>0)return;
+    // inp(contentEditable) 클릭 시: 선택만, 스탬프 재빌드 없이
+    const onInp=ev.target.classList.contains('note-input')||
+                ev.target.closest('.note-input');
+    selectField(f.id, true); // skipStampRebuild=true
+    if(onInp && !state.previewMode){
+      // 편집 모드: 텍스트 영역 클릭은 선택만, 드래그 안 함 (텍스트 편집 허용)
+      active=false; return;
+    }
+    // 미리보기 모드에서 note-input 위 클릭 시:
+    // pointer-events를 일시 차단해 브라우저 텍스트 선택 동작이 드래그를 가로채지 못하게 함
+    if(onInp && state.previewMode && inp){
+      inp.style.pointerEvents='none';
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    sx=ev.clientX; sy=ev.clientY; ox=f.x; oy=f.y;
+    pid=ev.pointerId;
+    active=true; dragging=false;
+    try{el.setPointerCapture?.(pid)}catch(e){}
+    document.body.classList.add('note-dragging');
+  }
+
+  // pointermove는 document에서 받아야 contentEditable 간섭 없음
+  function onMove(ev){
+    if(!active||ev.pointerId!==pid)return;
+    const dx=ev.clientX-sx, dy=ev.clientY-sy;
+    if(!dragging){
+      if(Math.hypot(dx,dy)<THRESHOLD)return;
+      // 드래그 확정 — threshold 통과 시점에 snapshot (단순 클릭은 저장 안 함)
+      snapshot();
+      if(document.activeElement&&el.contains(document.activeElement))
+        document.activeElement.blur();
+      if(inp)inp.style.pointerEvents='none'; // 텍스트영역 이벤트 차단
+      el.style.cursor='grabbing';
+      dragging=true;
+    }
+    ev.preventDefault?.();
+    f.x=Math.max(0,Math.round(ox+dx));
+    f.y=Math.max(0,Math.round(oy+dy));
+    el.style.left=f.x+'px';
+    el.style.top=f.y+'px';
+    el.dataset.pos=`p${f.page} x:${f.x} y:${f.y}`;
+    // 모바일에서는 pointermove 중 renderFieldList/syncJson가 매우 무겁다.
+    // 이동 중에는 DOM 위치만 갱신하고, 목록/JSON/편집 패널은 pointerup에서 한 번만 동기화한다.
+  }
+
+  function onUp(ev){
+    if(!active||ev.pointerId!==pid)return;
+    suppressOverlayClick(500);
+    const inpEl2=el.querySelector('.note-input');
+    if(inpEl2)inpEl2.style.pointerEvents=''; // 차단 해제
+    el.style.cursor='';
+    if(dragging){
+      suppressOverlayClick(500);
+      const pageChanged=rebaseFieldToVisualPage(f,el);
+      const ePage=document.getElementById('ePage');if(ePage)ePage.value=f.page;
+      const eX=document.getElementById('eX');if(eX)eX.value=f.x;
+      const eY=document.getElementById('eY');if(eY)eY.value=f.y;
+      if(pageChanged){
+        renderAll(false);
+      }else{
+        renderFieldList(); renderEditPanel(); syncJson();
+      }
+    } else if(f.type==='sign'){
+      // 서명 노트 단순 클릭 → 선택만 (모달은 활성화 후 더블클릭으로)
+    }
+    try{el.releasePointerCapture?.(pid)}catch(e){}
+    document.body.classList.remove('note-dragging');
+    active=false; dragging=false; pid=-1;
+  }
+
+  el.addEventListener('pointerdown', onDown);
+  // click stopPropagation 대신 suppressOverlayClick 사용
+  // — stopPropagation은 dblclick 인식을 방해할 수 있음
+  el.addEventListener('click', ev=>{ev.stopPropagation();suppressOverlayClick(100)});
+  el.addEventListener('dblclick', ev=>ev.stopPropagation());
+  // move/up은 전역 단일 핸들러로 위임 — 노트마다 document 리스너를 쌓지 않음
+  _noteDragHandlers.set(el, {onMove, onUp});
+}
+
+function installResize(handle,f,el,mode){
+  let sx,sy,ow,os,dragging=false;
+  handle.addEventListener('pointerdown',ev=>{
+    suppressOverlayClick(500);
+    snapshot(); // 리사이즈 시작 전 Undo 스냅샷
+    dragging=true;sx=ev.clientX;sy=ev.clientY;
+    ow=f.w||el.offsetWidth;os=f.size||13;
+    if(mode==='width')f.autoW=false;
+    handle.setPointerCapture(ev.pointerId);ev.stopPropagation();ev.preventDefault()
+  });
+  handle.addEventListener('pointermove',ev=>{
+    if(!dragging)return;
+    if(mode==='width'){
+      f.w=Math.max(30,Math.round(ow+ev.clientX-sx));
+      el.style.width=f.w+'px';
+      // 상세편집 패널 숫자 실시간 반영
+      const eW=document.getElementById('eW');if(eW)eW.value=f.w;
+    } else {
+      f.size=Math.max(7,Math.min(36,Math.round(os-(ev.clientY-sy)*0.3)));
+      el.style.fontSize=f.size+'px';
+      // 상세편집 패널 숫자 실시간 반영
+      const eSize=document.getElementById('eSize');if(eSize)eSize.value=f.size;
+    }
+    syncJson()
+  });
+  handle.addEventListener('pointerup',()=>{
+    dragging=false;
+    // 드래그 끝나면 목록·편집패널 동기화
+    renderFieldList();renderEditPanel()
+  })
+}
+
+// ── 빠른 값 입력 (탭1) ──
+// buildQuickValues: 처음 or 필드 목록 바뀔 때만 DOM 전체 재생성
+// syncQuickValues: 입력 중에는 값/스타일만 동기화 (포커스 유지)
+
+function classifyFields(){
+  const byPage={};   // { 'p1': [f,...], 'p3': [...] }
+  const byGroup={};  // { '예금주와의 관계': [f,...] }
+  const singleChecks=[];
+  state.fields.forEach(f=>{
+    if(f.type==='sign')return; // 서명은 값입력 탭에 안 나옴
+    if(f.type==='check'&&f.group){
+      if(!byGroup[f.group])byGroup[f.group]=[];
+      byGroup[f.group].push(f)
+    } else if(f.type==='text'){
+      const k='p'+f.page;
+      if(!byPage[k])byPage[k]=[];
+      byPage[k].push(f)
+    } else {
+      singleChecks.push(f)
+    }
+  });
+  return{byPage,byGroup,singleChecks}
+}
+
+function buildQuickValues(){
+  const q=$('quickValues');
+  if(!state.fields.length){
+    q.innerHTML='<div class="empty-hint"><div class="icon">📄</div><div>파일을 열고 상단의 <b>＋텍스트</b>, <b>＋체크</b>, <b>✍ 서명</b>을 눌러<br>필드를 배치하세요</div></div>';
+    return
+  }
+  q.innerHTML='';
+  const{byPage,byGroup,singleChecks}=classifyFields();
+
+  // 1. 페이지별 텍스트 필드
+  Object.keys(byPage).sort().forEach(pk=>{
+    const pageNo=pk.slice(1);
+    const grpDiv=document.createElement('div');grpDiv.className='field-group';
+    const title=document.createElement('div');title.className='field-group-title';title.textContent=pageNo+'쪽';
+    grpDiv.appendChild(title);
+    byPage[pk].forEach(f=>{
+      const row=makeTextRow(f);
+      grpDiv.appendChild(row)
+    });
+    q.appendChild(grpDiv)
+  });
+
+  // 2. 체크 그룹 (예금주와의 관계 등)
+  if(Object.keys(byGroup).length){
+    const grpDiv=document.createElement('div');grpDiv.className='field-group';
+    const title=document.createElement('div');title.className='field-group-title';title.textContent='체크 항목';
+    grpDiv.appendChild(title);
+    Object.keys(byGroup).forEach(gk=>{
+      const row=makeCheckGroupRow(gk,byGroup[gk]);
+      grpDiv.appendChild(row)
+    });
+    q.appendChild(grpDiv)
+  }
+
+  // 3. 단독 체크 — 1개씩 독립 행으로 표시 (라벨 그대로)
+  // 피보험자/수익자 쌍 묶기 로직은 라벨에 그 단어가 포함된 경우에만 적용
+  if(singleChecks.length){
+    const grpDiv=document.createElement('div');grpDiv.className='field-group';
+    const title=document.createElement('div');title.className='field-group-title';title.textContent='체크';
+    grpDiv.appendChild(title);
+    // 피보험자/수익자 쌍은 base 기준으로 묶고, 그 외는 1개씩 독립 행
+    const pairs={};
+    const standalone=[];
+    singleChecks.forEach(f=>{
+      if(f.label.includes('피보험자')||f.label.includes('수익자')){
+        const base=f.label.replace(/-?피보험자|-?수익자/g,'').trim()||'동의';
+        if(!pairs[base])pairs[base]=[];
+        pairs[base].push(f)
+      } else {
+        standalone.push(f)
+      }
+    });
+    // 독립 체크: 체크 기호 클릭으로 토글하는 단순 행
+    standalone.forEach(f=>{
+      const row=makeStandaloneCheckRow(f);
+      grpDiv.appendChild(row)
+    });
+    // 피보험자/수익자 쌍
+    Object.keys(pairs).forEach(base=>{
+      const row=makeSingleCheckRow(base,pairs[base]);
+      grpDiv.appendChild(row)
+    });
+    q.appendChild(grpDiv)
+  }
+}
+
+function makeTextRow(f){
+  const row=document.createElement('div');
+  row.className='quick-row'+(f.value?' has-value':'')+(f.id===state.selectedId?' focused':'');
+  row.dataset.fid=f.id;
+
+  const label=document.createElement('label');
+  label.textContent=f.label;
+  label.htmlFor='qv_'+f.id;
+  label.style.cssText='min-width:90px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer';
+
+  const inp=document.createElement('input');
+  inp.type='text';inp.id='qv_'+f.id;inp.value=f.value;
+  inp.placeholder='입력...';inp.dataset.fid=f.id;
+  inp.style.cssText='flex:1;border:none;background:transparent;font:inherit;font-size:13px;color:var(--text);outline:none;padding:0;min-width:0';
+
+  inp.addEventListener('focus',()=>{
+    // 포커스 시 선택만 표시 — DOM 재빌드 금지
+    state.selectedId=f.id;
+    // 다른 행 focused 클래스 업데이트 (DOM 유지)
+    document.querySelectorAll('.quick-row').forEach(r=>{
+      r.classList.toggle('focused',r.dataset.fid===f.id)
+    });
+    renderFieldList();renderEditPanel();
+    scrollToField(f);
+    beginEditSnapshot(); // 입력 시작 전 상태 보관
+  });
+  inp.addEventListener('blur',()=>{
+    commitEditSnapshot(); // 변경이 있었을 때만 히스토리 추가
+  });
+
+  inp.addEventListener('input',()=>{
+    f.value=inp.value;
+    row.classList.toggle('has-value',inp.value.length>0);
+    // 노트 본문 업데이트 및 글자양 기준 폭 자동 조정 (DOM 재생성 없이)
+    const noteEl=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+    if(noteEl)autoFitTextField(f,noteEl);
+    const noteInp=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"] .note-input`);
+    if(noteInp&&document.activeElement!==noteInp){
+      setNoteInputVisual(noteInp,f)
+    }
+    syncJson()
+  });
+
+  row.append(label,inp);
+  return row
+}
+
+function makeCheckGroupRow(groupName,fields){
+  const row=document.createElement('div');
+  row.className='quick-row';
+  row.style.cssText='flex-direction:column;align-items:flex-start;gap:6px';
+
+  const label=document.createElement('label');
+  label.textContent=groupName;
+  label.style.cssText='font-size:12px;font-weight:700;color:var(--text-muted)';
+
+  const wrap=document.createElement('div');wrap.className='check-wrap';
+  wrap.dataset.groupkey=fields[0]?.groupKey||groupName;
+
+  fields.forEach(f=>{
+    const btn=document.createElement('button');
+    btn.className='check-btn'+(f.value?' on':'');
+    btn.dataset.fid=f.id;
+    // 왼쪽: 현재 기호, 오른쪽: 라벨
+    const symSpan=document.createElement('span');symSpan.className='chk-sym';
+    symSpan.textContent=f.value||'□';
+    symSpan.style.cssText='font-size:14px;margin-right:4px;min-width:14px;display:inline-block;text-align:center';
+    const lblSpan=document.createElement('span');lblSpan.textContent=f.groupVal||f.label;
+    btn.append(symSpan,lblSpan);
+    btn.addEventListener('click',()=>{
+      // 라디오: 같은 그룹 모두 끄고 이 필드만 순환
+      const wasOn=!!f.value;
+      snapshot();
+      fields.forEach(x=>{x.value='';updateNoteInp(x);
+        const b=document.querySelector(`.check-btn[data-fid="${CSS.escape(x.id)}"]`);
+        if(b){b.classList.remove('on');const s=b.querySelector('.chk-sym');if(s)s.textContent='□'}
+      });
+      if(!wasOn){
+        f.value='✔'; // 그룹은 ✔ 고정
+        btn.classList.add('on');symSpan.textContent='✔';
+        updateNoteInp(f);
+      }
+      syncJson()
+    });
+    wrap.appendChild(btn)
+  });
+
+  row.append(label,wrap);
+  return row
+}
+
+// 독립 체크 1행 — 텍스트 행과 동일: 라벨 + 현재 기호 표시 + picker 버튼 6개
+function makeStandaloneCheckRow(f){
+  const row=document.createElement('div');
+  row.className='quick-row'+(f.value?' has-value':'')+(f.id===state.selectedId?' focused':'');
+  row.dataset.fid=f.id;
+
+  const label=document.createElement('label');
+  label.textContent=f.label;
+  label.htmlFor='qv_ck_'+f.id;
+  label.style.cssText='min-width:90px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer';
+
+  // 현재 값 표시 (읽기전용 span — 클릭하면 선택)
+  const valSpan=document.createElement('span');
+  valSpan.id='qv_ck_'+f.id;
+  valSpan.textContent=f.value||'';
+  valSpan.style.cssText='flex:1;font-size:15px;min-width:20px;cursor:pointer;color:var(--text)';
+  valSpan.addEventListener('click',()=>{
+    state.selectedId=f.id;
+    document.querySelectorAll('.quick-row').forEach(r=>r.classList.toggle('focused',r.dataset.fid===f.id));
+    renderFieldList();renderEditPanel();scrollToField(f);
+  });
+
+  // 기호 picker — 텍스트 행과 동일한 6개 버튼
+  const symPicker=document.createElement('div');
+  symPicker.style.cssText='display:flex;gap:2px;flex-shrink:0';
+  ['✔','✓','●','○','■','□'].forEach(sym=>{
+    const s=document.createElement('button');
+    s.textContent=sym;s.title=sym+' 선택';
+    s.style.cssText='border:1px solid var(--border-light);border-radius:4px;background:#f8fafc;cursor:pointer;font-size:13px;padding:1px 4px;line-height:1;color:var(--text);flex-shrink:0';
+    s.onmouseenter=()=>s.style.background='var(--accent-light)';
+    s.onmouseleave=()=>s.style.background='#f8fafc';
+    s.onclick=ev=>{
+      ev.preventDefault();
+      snapshot();
+      // 같은 기호 클릭 시 해제, 다른 기호면 설정
+      f.value=(f.value===sym)?'':sym;
+      valSpan.textContent=f.value;
+      row.classList.toggle('has-value',!!f.value);
+      const ni=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"] .note-input`);
+      if(ni)setNoteInputVisual(ni,f);
+      renderFieldList();renderEditPanel();syncJson()
+    };
+    symPicker.appendChild(s)
+  });
+
+  row.append(label,valSpan,symPicker);
+  return row
+}
+
+function makeSingleCheckRow(base,fields){
+  const row=document.createElement('div');
+  row.className='quick-row';
+  row.style.cssText='align-items:center;flex-wrap:wrap;gap:6px';
+
+  const label=document.createElement('label');
+  label.textContent=base;
+  label.style.cssText='min-width:110px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--text-muted)';
+
+  const wrap=document.createElement('div');wrap.className='check-wrap';
+  fields.forEach(f=>{
+    const btn=document.createElement('button');
+    btn.className='check-btn'+(f.value?' on':'');
+    btn.dataset.fid=f.id;
+    const symSpan=document.createElement('span');symSpan.className='chk-sym';
+    symSpan.textContent=f.value||'□';
+    symSpan.style.cssText='font-size:14px;margin-right:4px;min-width:14px;display:inline-block;text-align:center';
+    const lblSpan=document.createElement('span');
+    lblSpan.textContent=f.label;  // 라벨 그대로 표시 (피보험자/수익자 하드코딩 제거)
+    btn.append(symSpan,lblSpan);
+    btn.addEventListener('click',()=>{
+      snapshot();
+      f.value=nextCheckSymbol(f.value);
+      btn.classList.toggle('on',!!f.value);
+      symSpan.textContent=f.value||'□';
+      updateNoteInp(f);
+      syncJson()
+    });
+    wrap.appendChild(btn)
+  });
+
+  row.append(label,wrap);
+  return row
+}
+
+// ── 체크 기호 정의 ──
+const CHECK_SYMBOLS = ['✔', '✓', '●', '■', '○', '□'];
+// 빈값 → ✔, 이미 기호 → 다음 순환, 마지막(□/빈) → 빈값
+function nextCheckSymbol(current){
+  if(!current) return '✔';
+  const idx = CHECK_SYMBOLS.indexOf(current);
+  if(idx === -1) return '✔';            // 모르는 값 → ✔
+  const next = CHECK_SYMBOLS[idx + 1];
+  return next === '□' || !next ? '' : next; // □ 또는 끝 → 빈값(체크 해제)
+}
+function updateNoteInp(f){
+  const ni=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"] .note-input`);
+  if(!ni)return;
+  setNoteInputVisual(ni,f);
+}
+
+// 입력 중에 호출 — DOM 교체 없이 값/클래스만 동기화
+function syncQuickValues(){
+  state.fields.forEach(f=>{
+    const inp=document.querySelector(`input[data-fid="${CSS.escape(f.id)}"]`);
+    if(inp&&document.activeElement!==inp)inp.value=f.value; // 포커스 중인 칸은 건드리지 않음
+    const row=inp?.closest('.quick-row');
+    if(row){
+      row.classList.toggle('has-value',f.value.length>0);
+      row.classList.toggle('focused',f.id===state.selectedId)
+    }
+    // 체크 버튼 (사이드바) — 값이 있으면 on
+    const btn=document.querySelector(`.check-btn[data-fid="${CSS.escape(f.id)}"]`);
+    if(btn){
+      btn.classList.toggle('on',!!f.value);
+      // 버튼 안에 현재 기호 표시
+      const symSpan=btn.querySelector('.chk-sym');
+      if(symSpan)symSpan.textContent=f.value||'□';
+    }
+    // 노트 본문 싱크
+    const noteInp2=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"] .note-input`);
+    if(noteInp2&&document.activeElement!==noteInp2){
+      setNoteInputVisual(noteInp2,f);
+    }
+  })
+}
+
+function scrollToField(f){
+  const p=state.pages[f.page-1];if(!p)return;
+  const el=p.overlay.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+  if(!el)return;
+  // 이미 뷰포트 안에 있으면 스크롤 안 함 — 화면 밖일 때만 최소 이동
+  const r=el.getBoundingClientRect();
+  const inView=r.top>=0&&r.bottom<=(window.innerHeight||document.documentElement.clientHeight)
+               &&r.left>=0&&r.right<=(window.innerWidth||document.documentElement.clientWidth);
+  if(!inView)el.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
+}
+
+// ── 필드 목록 (탭2) ──
+function renderFieldList(){
+  const list=$('fieldList');
+  if(!state.fields.length){
+    list.innerHTML='<div class="empty-hint"><div class="icon">🗂</div><div>필드가 없습니다</div></div>';
+    return
+  }
+  list.innerHTML='';
+  state.fields.forEach(f=>{
+    const d=document.createElement('div');
+    d.className='field-list-item '+(f.id===state.selectedId?'active':'');
+    const icon=f.type==='check'?'☑':(f.type==='sign'?'✍':'T');
+    // 정보 영역
+    const info=document.createElement('div');info.className='fli-icon';info.textContent=icon;
+    const infoText=document.createElement('div');infoText.className='fli-info';
+    infoText.innerHTML=`<div class="fli-name">${esc(f.label)}</div><div class="fli-pos">${f.page}쪽 · x:${f.x} y:${f.y}</div>`;
+    const val=document.createElement('span');val.className='fli-val';val.textContent=f.value||'';
+    // 삭제 버튼
+    const delBtn=document.createElement('button');
+    delBtn.className='btn sm danger';delBtn.style.cssText='padding:2px 7px;font-size:11px;margin-left:4px;flex-shrink:0';
+    delBtn.textContent='✕';delBtn.title='이 필드 삭제';
+    delBtn.onclick=ev=>{
+      ev.stopPropagation();
+      snapshot();
+      if(state.selectedId===f.id)state.selectedId=null;
+      state.fields=state.fields.filter(x=>x.id!==f.id);
+      renderAll(false)
+    };
+    d.append(info,infoText,val,delBtn);
+    d.onclick=()=>selectField(f.id);
+    list.appendChild(d)
+  })
+}
+
+// ── 상세 편집 (탭3) ──
+function renderEditPanel(){
+  const panel=$('editPanel');
+  const f=selected();
+  if(!f){panel.innerHTML='<div class="no-field-msg">필드를 선택하면<br>여기서 상세 편집할 수 있습니다</div>';return}
+  panel.innerHTML=`
+    <div class="edit-section">
+      <div class="edit-section-title">기본 정보</div>
+      <div class="form-row"><label>라벨</label><input id="eLabel" type="text" value="${esc(f.label)}"></div>
+      <div class="form-row"><label>값</label><textarea id="eValue">${esc(f.value)}</textarea></div>
+      <div class="form-row"><label>종류</label>
+        <select id="eType"><option value="text" ${f.type==='text'?'selected':''}>텍스트</option><option value="check" ${f.type==='check'?'selected':''}>체크</option><option value="sign" ${f.type==='sign'?'selected':''}>서명</option></select>
+      </div>
+    </div>
+    <div class="edit-section">
+      <div class="edit-section-title">위치 / 크기</div>
+      <div class="form-row"><label>페이지</label><input id="ePage" type="number" min="1" value="${f.page}"></div>
+      <div class="coord-grid">
+        <div class="form-row"><label>X</label><input id="eX" type="number" value="${f.x}"></div>
+        <div class="form-row"><label>Y</label><input id="eY" type="number" value="${f.y}"></div>
+      </div>
+      <div class="form-row"><label>글자크기</label><input id="eSize" type="number" min="6" value="${f.size}"></div>
+      <div class="form-row"><label>폭</label><input id="eW" type="number" min="0" value="${f.w||0}">
+        ${f.type==='text'?`<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-muted);margin-left:6px;cursor:pointer;white-space:nowrap"><input id="eAutoW" type="checkbox" ${f.autoW!==false?'checked':''} style="margin:0"> 자동폭</label>`:''}
+      </div>
+      <div class="form-row"><label>가로배율</label><input id="eScaleX" type="number" min="30" max="200" value="${f.scaleX}"></div>
+      <div class="form-row"><label>색상</label><input id="eColor" type="color" value="${f.color}" style="width:50px;height:32px;padding:2px;cursor:pointer;border:1px solid var(--border);border-radius:6px"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+      ${f.type==='sign'?'<button class="btn sm" id="eCopySignBtn" style="background:#ecfdf5;border-color:#86efac;color:#166534">⧉ 서명복사</button><button class="btn sm" id="eEditSignBtn">✍ 서명수정</button>':''}
+      <button class="btn danger sm" id="eDeleteBtn">🗑 삭제</button>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:11px;color:var(--text-light)">화살표키로 1px, Shift+화살표로 10px 이동합니다</div>
+  `;
+
+  // eW를 직접 수정한 경우에만 autoW=false — 다른 필드 수정 시 자동폭 유지
+  const apply=(ev)=>{
+    const f2=selected();if(!f2)return;
+    f2.label=$('eLabel').value;f2.value=$('eValue').value;
+    f2.type=$('eType').value;f2.page=Number($('ePage').value);
+    f2.x=Number($('eX').value);f2.y=Number($('eY').value);
+    f2.size=Number($('eSize').value);
+    f2.scaleX=Number($('eScaleX').value);
+    f2.color=$('eColor').value||'#111111';
+    if(ev?.target?.id==='eAutoW'){
+      // 자동폭 체크박스 직접 토글
+      f2.autoW=$('eAutoW')?.checked!==false;
+      if(f2.autoW)f2.w=getAutoTextWidth(f2);
+    } else if(ev?.target?.id==='eW'){
+      // 폭 입력칸 직접 수정 → 수동폭으로 전환
+      f2.w=Number($('eW').value||0);
+      if(f2.type==='text'&&f2.w>0){f2.autoW=false;if($('eAutoW'))$('eAutoW').checked=false;}
+    } else if(f2.type==='text'&&f2.autoW!==false){
+      // 다른 필드 수정 → 자동폭 유지
+      f2.w=getAutoTextWidth(f2);
+    }
+    renderStamps();syncQuickValues();renderFieldList();syncJson()
+  };
+  // focus 시 편집 스냅샷 시작, change(확정) 시 커밋 — input마다 히스토리 과적 방지
+  ['eLabel','eValue','eType','ePage','eX','eY','eSize','eW','eScaleX','eColor','eAutoW'].forEach(id=>{
+    const el=$(id);if(!el)return;
+    el.addEventListener('focus',beginEditSnapshot);
+    el.addEventListener('change',commitEditSnapshot);
+    el.addEventListener('input',apply);
+  });
+  const copySignPanelBtn=$('eCopySignBtn');
+  if(copySignPanelBtn)copySignPanelBtn.onclick=()=>copySignField(f);
+  const editSignPanelBtn=$('eEditSignBtn');
+  if(editSignPanelBtn)editSignPanelBtn.onclick=()=>openSignModal(f);
+  $('eDeleteBtn').onclick=()=>{
+    snapshot();
+    state.fields=state.fields.filter(x=>x.id!==f.id);state.selectedId=null;renderAll(false)
+  }
+}
+
+function selectField(id, skipStampRebuild=false){
+  const changed=state.selectedId!==id;
+  state.selectedId=id;
+  // active 클래스는 항상 갱신 (skipStampRebuild와 무관)
+  document.querySelectorAll('.note').forEach(n=>{
+    n.classList.toggle('active', n.dataset.id===id)
+  });
+  syncQuickValues();renderFieldList();renderEditPanel();syncJson();updateSelectedMiniBar();updateJpgPageButtons();updateFocusModeBySelection();
+  const f=selected();if(f&&changed)scrollToField(f);
+  // 값 입력 탭이 활성일 때만 사이드바 quick-row도 스크롤 동기화
+  if(changed&&getActiveTabName()==='input'){
+    const qvRow=document.querySelector(`.quick-row[data-fid="${CSS.escape(id)}"]`);
+    if(qvRow)qvRow.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+}
+
+// ── 키보드 ──
+// 작업 내용 보호 — 필드가 있는 상태에서 새로고침/탭 닫기 시 경고
+window.addEventListener('beforeunload', ev=>{
+  if(state.fields.length>0){
+    ev.preventDefault();
+    ev.returnValue=''; // 크롬/엣지에서 필수
+  }
+});
+
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){clearAddMode();return;}
+  // Ctrl+Z: 실행취소, Ctrl+Y / Ctrl+Shift+Z: 다시실행
+  if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key==='z'){
+    if(document.activeElement.contentEditable==='true')return; // 텍스트 편집 중엔 브라우저 기본 동작
+    ev.preventDefault();undoAction();return;
+  }
+  if((ev.ctrlKey||ev.metaKey)&&(ev.key==='y'||(ev.shiftKey&&ev.key==='z'))){
+    ev.preventDefault();redoAction();return;
+  }
+  const f=selected();if(!f)return;
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(ev.key)){
+    if(document.activeElement.contentEditable==='true'||document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')return;
+    ev.preventDefault();
+    // 연속 화살표 이동: 처음 키 다운 시 한 번만 snapshot (키 업 전까지 중복 방지)
+    if(!ev.repeat)snapshot();
+    const step=ev.shiftKey?10:1;
+    if(ev.key==='ArrowLeft')f.x=Math.max(0,f.x-step);
+    if(ev.key==='ArrowRight')f.x+=step;
+    if(ev.key==='ArrowUp')f.y=Math.max(0,f.y-step);
+    if(ev.key==='ArrowDown')f.y+=step;
+    // 노트 위치만 직접 갱신 (전체 재빌드 없이)
+    const el=document.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+    if(el){el.style.left=f.x+'px';el.style.top=f.y+'px';el.dataset.pos=`p${f.page} x:${f.x} y:${f.y}`}
+    syncQuickValues();renderFieldList();renderEditPanel();syncJson()
+  }
+});
+
+// ── 버튼들 ──
+// 값만 초기화 (필드 위치 유지)
+$('clearValuesBtn').onclick=()=>{
+  if(!state.fields.length)return;
+  if(!confirm('모든 입력값을 지웁니다. 필드 위치는 유지됩니다.'))return;
+  snapshot();
+  state.fields.forEach(f=>{f.value='';f.imgData='';});
+  renderAll(false);log('입력값 초기화 완료');
+};
+// 필드 전체 삭제
+$('clearAllBtn').onclick=()=>{
+  if(!state.fields.length)return;
+  if(!confirm('필드를 전부 삭제합니다. (Ctrl+Z로 되돌릴 수 있습니다)'))return;
+  snapshot();
+  state.fields=[];state.selectedId=null;
+  renderAll(false);log('필드 전체 삭제');
+};
+
+$('addTextBtn').onclick=()=>setAddMode('text');
+$('addCheckBtn').onclick=()=>setAddMode('check');
+$('addSignBtn').onclick=()=>{
+  if(!state.pages.length)return alert('파일을 먼저 열어주세요.');
+  openSignModal(null);
+};
+$('copySignBtn').onclick=()=>copySignField(null);
+$('previewModeBtn').onclick=()=>setPreviewMode(!state.previewMode);
+$('miniNudgeLeft').onclick=e=>nudgeSelected(-1,0,e.shiftKey?10:1);
+$('miniNudgeRight').onclick=e=>nudgeSelected(1,0,e.shiftKey?10:1);
+$('miniNudgeUp').onclick=e=>nudgeSelected(0,-1,e.shiftKey?10:1);
+$('miniNudgeDown').onclick=e=>nudgeSelected(0,1,e.shiftKey?10:1);
+$('miniDuplicate').onclick=()=>duplicateSelectedField();
+$('miniDelete').onclick=()=>deleteSelectedField();
+
+// ── 서명 모달 ──
+let _signTarget=null; // 기존 서명 필드 수정 시
+let _signImgDataUrl=''; // 업로드 이미지 dataURL
+let _signDrawn=false;
+
+function openSignModal(existingField){
+  _signTarget=existingField||null;
+  _signImgDataUrl='';_signDrawn=false;
+  $('signHint').style.display='';
+  $('signImgPreview').style.display='none';
+  // 캔버스 초기화
+  const canvas=$('signCanvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // 탭 초기화
+  document.querySelectorAll('.sign-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sign-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('.sign-tab[data-stab="draw"]').classList.add('active');
+  $('stab-draw').classList.add('active');
+  $('signModalBg').classList.remove('hidden');
+  // 모바일: 모달 열린 동안 배경 스크롤/터치 스크롤 완전 차단
+  document.body.classList.add('modal-open');
+  initSignCanvas();
+}
+function closeSignModal(){
+  $('signModalBg').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+function initSignCanvas(){
+  const oldCanvas=$('signCanvas');
+  // 기존 이벤트를 확실히 제거하기 위해 복제 후, 새 캔버스 자체를 기준으로 좌표·ctx를 다시 잡는다.
+  const canvas=oldCanvas.cloneNode(true);
+  oldCanvas.parentNode.replaceChild(canvas,oldCanvas);
+  const rect=canvas.getBoundingClientRect();
+  if(rect.width>0){
+    canvas.width=Math.round(rect.width);
+    canvas.height=Math.round(rect.height||180);
+  }
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  let drawing=false;
+  let lastX=0,lastY=0;
+
+  function getPos(ev){
+    const r=canvas.getBoundingClientRect();
+    const pt=ev.touches?.[0]||ev;
+    return{x:pt.clientX-r.left,y:pt.clientY-r.top};
+  }
+  function start(ev){
+    ev.preventDefault();drawing=true;
+    const{x,y}=getPos(ev);lastX=x;lastY=y;
+    $('signHint').style.display='none';_signDrawn=true;
+    canvas.setPointerCapture?.(ev.pointerId);
+  }
+  function move(ev){
+    if(!drawing)return;ev.preventDefault();
+    const{x,y}=getPos(ev);
+    ctx.beginPath();
+    ctx.strokeStyle=$('signColor').value||'#111111';
+    ctx.lineWidth=Number($('signWidth').value||2);
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.moveTo(lastX,lastY);ctx.lineTo(x,y);ctx.stroke();
+    lastX=x;lastY=y;
+  }
+  function end(){drawing=false}
+
+  canvas.addEventListener('pointerdown',start);
+  canvas.addEventListener('pointermove',move);
+  canvas.addEventListener('pointerup',end);
+  canvas.addEventListener('pointercancel',end);
+  canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',end);
+}
+
+// 서명 탭 전환
+document.querySelectorAll('.sign-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.sign-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.sign-panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    $('stab-'+tab.dataset.stab).classList.add('active');
+    if(tab.dataset.stab==='draw')setTimeout(initSignCanvas,50);
+  })
+});
+
+// 굵기 슬라이더
+$('signWidth').oninput=()=>{$('signWidthVal').textContent=$('signWidth').value+'px'};
+// 지우기
+$('signClearBtn').onclick=()=>{
+  const c=$('signCanvas');c.getContext('2d').clearRect(0,0,c.width,c.height);
+  $('signHint').style.display='';_signDrawn=false;
+};
+
+// 이미지 업로드
+function handleSignImg(file){
+  if(!file||!file.type.startsWith('image/'))return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    _signImgDataUrl=e.target.result;
+    $('signPreviewImg').src=_signImgDataUrl;
+    $('signImgPreview').style.display='';
+  };reader.readAsDataURL(file);
+}
+$('signImgInput').onchange=e=>handleSignImg(e.target.files[0]);
+$('signDropZone').onclick=()=>$('signImgInput').click();
+$('signDropZone').ondragover=e=>{e.preventDefault();$('signDropZone').style.borderColor='var(--accent)'};
+$('signDropZone').ondragleave=()=>{$('signDropZone').style.borderColor='var(--border)'};
+$('signDropZone').ondrop=e=>{e.preventDefault();$('signDropZone').style.borderColor='var(--border)';handleSignImg(e.dataTransfer.files[0])};
+
+// 취소
+$('signCancelBtn').onclick=()=>closeSignModal();
+$('signModalBg').onclick=e=>{if(e.target===$('signModalBg'))closeSignModal()};
+
+// 삽입
+$('signInsertBtn').onclick=()=>{
+  const activeTab=document.querySelector('.sign-tab.active')?.dataset.stab;
+  let dataUrl='';
+
+  if(activeTab==='draw'){
+    if(!_signDrawn)return alert('서명을 먼저 그려주세요.');
+    const c=$('signCanvas');
+    dataUrl=c.toDataURL('image/png');
+  } else {
+    if(!_signImgDataUrl)return alert('이미지를 선택해주세요.');
+    dataUrl=_signImgDataUrl;
+  }
+
+  snapshot(); // 서명 추가/수정 전 상태 저장
+  if(_signTarget){
+    // 기존 서명 업데이트
+    _signTarget.imgData=dataUrl;
+    renderAll(false);
+  } else {
+    // 새 서명 필드 추가
+    const pos=getDefaultInsertPosition(160,70);
+    const f=normalizeField({type:'sign',label:'서명',value:'sign',imgData:dataUrl,
+      page:pos.page,x:pos.x,y:pos.y,w:160,h:70,size:13});
+    state.fields.push(f);state.selectedId=f.id;
+    renderAll(false);
+    document.querySelector('[data-tab="fields"]').click();
+  }
+  closeSignModal();
+  log('서명 추가 완료 — 드래그로 위치 조정하세요');
+};
+
+// ── 고급 모달 ──
+document.querySelector('.topbar-logo').addEventListener('dblclick',()=>$('advModal').classList.remove('hidden'));
+$('closeAdvModal').onclick=()=>$('advModal').classList.add('hidden');
+$('advModal').addEventListener('click',ev=>{if(ev.target===$('advModal'))$('advModal').classList.add('hidden')});
+
+$('applyOffsetBtn').onclick=()=>{
+  const dx=Number($('offsetX').value||0),dy=Number($('offsetY').value||0);
+  if(dx===0&&dy===0)return;
+  snapshot();
+  state.fields.forEach(f=>{f.x=Math.round(f.x+dx);f.y=Math.round(f.y+dy)});
+  $('offsetX').value=0;$('offsetY').value=0;renderAll(true);log(`전체 필드 x:${dx} y:${dy} 이동`)
+};
+['debugToggle','placeholderToggle'].forEach(id=>{const el=$(id);if(el)el.addEventListener('change',()=>renderAll(true))});
+
+// ── JSON 저장/불러오기 ──
+function syncJson(){
+  const jb=$('jsonBox');if(!jb)return;
+  jb.value=JSON.stringify(makeJsonObj(true),null,2)
+}
+$('loadJsonBtn')?.addEventListener('click',()=>applyJson($('jsonBox').value));
+$('downloadJsonBtn')?.addEventListener('click',()=>downloadBlob(new Blob([$('jsonBox').value],{type:'application/json'}),'template-v12.json'));
+$('saveLocalBtn')?.addEventListener('click',()=>{
+  try{
+    localStorage.setItem('formStamperV12',JSON.stringify(makeJsonObj(true)));
+    updateBrowserSaveInfo();log('브라우저에 저장');
+  }catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22){
+      alert('브라우저 저장 용량을 초과했습니다.\n서명 이미지가 많을 경우 발생할 수 있습니다.\n[저장] 탭의 JSON 파일 저장을 이용해 주세요.');
+    }else{throw e;}
+  }
+});
+$('loadLocalBtn')?.addEventListener('click',()=>{const s=localStorage.getItem('formStamperV12');if(!s)return alert('저장된 내용이 없습니다.');applyJson(s,true,true)});
+
+function makeJsonObj(withValues=true){
+  return{version:20,savedAt:new Date().toLocaleString('ko-KR'),
+    fileName:state.fileName||'',
+    // baseline: JSON 호환용 필드 — canvasToPdf() 좌표 계산에 현재 미사용
+    baseline:Number($('baseline')?.value||0.85),
+    fields:state.fields.map(f=>{
+      const{id,...rest}=f;
+      if(!withValues)return{...rest,value:'',imgData:''};
+      return rest;
+    })
+  }
+}
+function applyJson(jsonStr,withValues=true,askMerge=false){
+  let obj;
+  try{obj=JSON.parse(jsonStr)}catch(e){alert('JSON 파싱 실패: '+e.message);return}
+  if(!obj.fields||!Array.isArray(obj.fields)){alert('필드 데이터가 없습니다.');return}
+  if(askMerge&&state.fields.length>0){
+    const choice=confirm('현재 필드 '+state.fields.length+'개가 있습니다.\n\n[확인] 전체 덮어쓰기\n[취소] 기존 위치 유지 + 값만 채우기');
+    if(!choice){
+      snapshot();
+      obj.fields.forEach(inc=>{
+        const m=state.fields.find(f=>(f.key&&f.key===inc.key)||f.label===inc.label);
+        if(m&&withValues)m.value=inc.value||'';
+      });
+      state.selectedId=null;renderAll(false);log('값만 채워넣기 완료');return
+    }
+  }
+  snapshot();
+  state.fields=obj.fields.map(f=>normalizeField(withValues?f:{...f,value:''}));
+  if(obj.baseline&&$('baseline'))$('baseline').value=obj.baseline;
+  state.selectedId=null;renderAll(false);
+  log('불러오기 완료 — 필드 '+state.fields.length+'개 ('+(withValues?'위치+값':'위치만')+')')
+}
+
+// 탭4 저장 버튼
+function makeFileName(suffix,ext){
+  const base=(state.fileName||'form').replace(/\.[^.]+$/,'');
+  const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
+  return `${base}_${suffix}_${ts}.${ext}`;
+}
+$('saveLayoutBtn').onclick=()=>{
+  if(!state.fields.length)return alert('저장할 필드가 없습니다.');
+  downloadBlob(new Blob([JSON.stringify(makeJsonObj(false),null,2)],{type:'application/json'}),makeFileName('layout','json'));
+  log('위치 템플릿 저장 — '+state.fields.length+'개 필드')
+};
+$('saveAllBtn').onclick=()=>{
+  if(!state.fields.length)return alert('저장할 필드가 없습니다.');
+  downloadBlob(new Blob([JSON.stringify(makeJsonObj(true),null,2)],{type:'application/json'}),makeFileName('data','json'));
+  log('위치+값 저장 — '+state.fields.length+'개 필드')
+};
+
+// 파일 선택 미리보기
+let _pending=null;
+$('jsonFileInput').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const text=await file.text();_pending=JSON.parse(text);
+    const fields=_pending.fields||[];const withVal=fields.some(x=>x.value);
+    $('jsonPreviewText').innerHTML='<b>'+file.name+'</b><br>필드 '+fields.length+'개 · 저장일: '+(_pending.savedAt||'?')+'<br>원본: '+(_pending.fileName||'?')+'<br><span style="color:'+(withVal?'var(--success)':'var(--text-muted)')+'">'+(withVal?'✅ 입력값 포함':'📐 위치만')+'</span>';
+    $('jsonLoadPreview').style.display='';
+    $('loadAllBtn').disabled=!withVal;
+  }catch(ex){alert('읽기 실패: '+ex.message);_pending=null}
+  e.target.value='';
+});
+$('loadLayoutOnlyBtn').onclick=()=>{if(!_pending)return;applyJson(JSON.stringify(_pending),false,state.fields.length>0);hidePreview()};
+$('loadAllBtn').onclick=()=>{if(!_pending)return;applyJson(JSON.stringify(_pending),true,state.fields.length>0);hidePreview()};
+$('cancelLoadBtn').onclick=()=>hidePreview();
+function hidePreview(){$('jsonLoadPreview').style.display='none';_pending=null}
+
+// 브라우저 임시저장
+const LS_KEY='formStamperV12';
+function updateBrowserSaveInfo(){
+  const s=localStorage.getItem(LS_KEY);const el=$('browserSaveInfo');if(!el)return;
+  if(!s){el.textContent='저장된 내용 없음';return}
+  try{const o=JSON.parse(s);el.textContent='저장됨: '+(o.savedAt||'?')+' · 필드 '+(o.fields||[]).length+'개'}
+  catch{el.textContent='저장 데이터 있음'}
+}
+$('browserSaveBtn').onclick=()=>{
+  if(!state.fields.length)return alert('저장할 필드가 없습니다.');
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify(makeJsonObj(true)));
+    updateBrowserSaveInfo();log('브라우저 임시저장 완료');
+  }catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22){
+      alert('브라우저 저장 용량을 초과했습니다.\n서명 이미지가 많을 경우 발생할 수 있습니다.\n[저장] 탭의 JSON 파일 저장을 이용해 주세요.');
+      log('브라우저 임시저장 실패 — 용량 초과');
+    }else{throw e;}
+  }
+};
+$('browserLoadBtn').onclick=()=>{
+  const s=localStorage.getItem(LS_KEY);if(!s)return alert('저장된 내용이 없습니다.');
+  applyJson(s,true,state.fields.length>0)
+};
+$('browserClearBtn').onclick=()=>{
+  if(!confirm('브라우저 저장 내용을 삭제할까요?'))return;
+  localStorage.removeItem(LS_KEY);updateBrowserSaveInfo();log('브라우저 저장 삭제')
+};
+updateBrowserSaveInfo();
+
+// ── Undo/Redo 버튼 상태 업데이트 ──
+function updateUndoRedoBtns(){
+  const u=$('undoBtn'),r=$('redoBtn');
+  if(u)u.disabled=_history.undo.length===0;
+  if(r)r.disabled=_history.redo.length===0;
+}
+$('undoBtn')?.addEventListener('click',()=>undoAction());
+$('redoBtn')?.addEventListener('click',()=>redoAction());
+$('detectBtn').onclick=async()=>{
+  if(state.kind!=='pdf')return alert('PDF 파일만 자동감지 가능합니다.');
+  const labelRules=[
+    {label:'피보험자 성명',key:'insuredName',tests:['피보험자성명'],dx:110,dy:-12,w:210},
+    {label:'증권번호',key:'policyNo',tests:['증권번호'],dx:90,dy:-12,w:210},
+    {label:'주소',key:'address',tests:['주소'],dx:110,dy:-12,w:610,onlyPage:1},
+    {label:'주민등록번호',key:'rrn',tests:['주민등록번호'],dx:110,dy:-12,w:210,onlyPage:1},
+    {label:'직업',key:'job',tests:['직업'],dx:55,dy:-12,w:150,onlyPage:1},
+    {label:'사고 일시',key:'accidentDate',tests:['사고일시'],dx:90,dy:-12,w:220,onlyPage:1},
+    {label:'사고 장소',key:'accidentPlace',tests:['사고장소'],dx:90,dy:-12,w:280,onlyPage:1},
+    {label:'은행 이름',key:'bank',tests:['은행이름'],dx:95,dy:-12,w:235,onlyPage:1},
+    {label:'계좌번호',key:'account',tests:['계좌번호'],dx:80,dy:-12,w:145,onlyPage:1},
+  ];
+  const found=[];const seen=new Set();
+  for(let pi=1;pi<=state.pdf.numPages;pi++){
+    const page=await state.pdf.getPage(pi);const scale=state.pages[pi-1]?.scale||getRenderScaleForPage(page);const vp=page.getViewport({scale});
+    const tc=await page.getTextContent();
+    for(const item of tc.items){
+      const raw=(item.str||'').trim();if(!raw)continue;
+      const compact=raw.replace(/[\s　]+/g,'');
+      for(const rule of labelRules){
+        if(rule.onlyPage&&rule.onlyPage!==pi)continue;
+        if(!rule.tests.some(t=>compact===t||compact.includes(t)))continue;
+        const key=rule.key+'|'+pi;if(seen.has(key))continue;
+        const tr=pdfjsLib.Util.transform(vp.transform,item.transform);
+        found.push(normalizeField({key:rule.key,label:rule.label,type:'text',page:pi,x:Math.round(tr[4]+rule.dx),y:Math.round(tr[5]+rule.dy),w:rule.w||0,size:13,value:''}));
+        seen.add(key);break
+      }
+    }
+  }
+  if(!found.length)return log('라벨을 찾지 못했습니다.');
+  snapshot();
+  state.fields=dedupeFields(found);state.selectedId=null;renderAll(false);
+  log(`${state.fields.length}개 필드 자동생성 (위치 보정 필요)`)
+};
+
+// ── 공통 유틸 ──
+// object-fit:contain 비율 계산 — PDF저장·JPG저장·이미지PDF저장 3곳 공유
+function getContainedImageRect(boxW,boxH,imgW,imgH){
+  if(!boxW||!boxH||!imgW||!imgH)return{w:0,h:0,x:0,y:0};
+  const scale=Math.min(boxW/imgW,boxH/imgH);
+  const w=imgW*scale, h=imgH*scale;
+  return{w,h,x:(boxW-w)/2,y:(boxH-h)/2};
+}
+function hexToRgb(hex){
+  let h=(hex||'#111111').replace('#','');
+  if(h.length===3)h=h.split('').map(c=>c+c).join('');
+  const n=parseInt(h,16);
+  return{r:((n>>16)&255)/255,g:((n>>8)&255)/255,b:(n&255)/255}
+}
+function downloadBlob(blob,name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+function baseName(){return(state.fileName||'output').replace(/\.[^.]+$/,'')}
+
+async function getPdfFont(pdfDoc){
+  try{
+    if(window.fontkit)pdfDoc.registerFontkit(window.fontkit);
+    const url='https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf';
+    const fontBytes=await fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()});
+    return await pdfDoc.embedFont(fontBytes,{subset:true})
+  }catch(e){
+    // 한글 폰트 로드 실패 — 사용자에게 명시적으로 알리고 계속 여부 확인
+    const goOn=confirm(
+      '⚠️ 한글 폰트를 불러오지 못했습니다.\n\n'+
+      '원인: 네트워크 오류 또는 CDN 차단 ('+String(e?.message||e)+')\n\n'+
+      'Helvetica로 대체하면 PDF에서 한글이 빈칸으로 표시됩니다.\n\n'+
+      '[확인] 저장 계속 (한글 깨짐 감수)\n[취소] 저장 중단'
+    );
+    if(!goOn)throw new Error('사용자가 저장을 취소했습니다 (한글 폰트 로드 실패)');
+    return await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+  }
+}
+
+// ── 좌표 변환 헬퍼 ──
+// 뷰어 캔버스 좌표(f.x, f.y) → PDF 좌표
+// PDF는 Y=0이 페이지 하단. 뷰어는 Y=0이 상단.
+// viewW = pdfW * state.scale  (PDF→canvas 확대비)
+// 역산: pdfX = f.x / state.scale
+//       pdfY = pdfH - (f.y / state.scale) - fontSize_pdf
+function canvasToPdf(f, meta){
+  const sc = meta.scale || state.scale;
+  const pdfFontSize = f.size / sc;
+
+  // DOM에서 실제 텍스트 위치 측정
+  const rect = getNoteTextRect(f);
+  const textCanvasX = rect ? rect.x : f.x;
+  // fallback: f.y+18 하드코딩 제거 → getTextAnchorOffsetY()로 통일
+  const textCanvasY = rect ? rect.y : (f.y + getTextAnchorOffsetY());
+
+  const pdfX = textCanvasX / sc;
+  // PDF Y축 반전 (하단=0)
+  const pdfY = meta.pdfH - (textCanvasY / sc) - pdfFontSize;
+  return {x:pdfX, y:pdfY, size:pdfFontSize}
+}
+
+// ── PDF 저장 ──
+$('exportPdfBtn').onclick=async()=>{
+  if(!state.pages.length)return alert('파일을 먼저 열어주세요.');
+  if(state.kind==='pdf')await exportPdfOnOriginal();
+  else await exportImageAsPdf()
+};
+
+async function exportPdfOnOriginal(){
+  log('PDF 생성 중...');
+  const pdfDoc=await PDFLib.PDFDocument.load(state.bytes.slice(0));
+  const font=await getPdfFont(pdfDoc);
+  const pdfPages=pdfDoc.getPages();
+  for(const f of state.fields){
+    if(!f.value&&!f.imgData)continue;
+    const meta=state.pages[f.page-1];
+    const page=pdfPages[f.page-1];
+    if(!meta||!page)continue;
+    const sc=meta.scale||state.scale;
+
+    if(f.type==='sign'&&f.imgData){
+      // 서명 이미지 임베드 — object-fit:contain 방식으로 비율 유지
+      try{
+        const bodyRect=getNoteBodyRect(f);
+        const sc=meta.scale||state.scale;
+        const bx=bodyRect?bodyRect.x/sc:f.x/sc;
+        const by=bodyRect?bodyRect.y/sc:f.y/sc;
+        const bw=bodyRect?bodyRect.w/sc:(f.w||160)/sc;
+        const bh=bodyRect?bodyRect.h/sc:(f.h||70)/sc;
+        const {naturalWidth:iw,naturalHeight:ih}=await new Promise(res=>{
+          const im=new Image();im.onload=()=>res(im);im.src=f.imgData;
+        });
+        const{w:nw,h:nh,x:ox,y:oy}=getContainedImageRect(bw,bh,iw,ih);
+        const b64=f.imgData.split(',')[1];
+        const bin=atob(b64);const arr=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+        const isPng=f.imgData.startsWith('data:image/png');
+        const pdfImg=isPng?await pdfDoc.embedPng(arr):await pdfDoc.embedJpg(arr);
+        page.drawImage(pdfImg,{x:bx+ox,y:meta.pdfH-(by+oy)-nh,width:nw,height:nh});
+      }catch(e){console.warn('서명 이미지 임베드 실패',e)}
+      continue;
+    }
+
+    if(!f.value)continue;
+    const {x,y,size}=canvasToPdf(f,meta);
+    const rgb=hexToRgb(f.color);
+    const lines=f.value.split('\n');
+    lines.forEach((line,i)=>{
+      if(!line)return;
+      page.drawText(line,{x,y:y-(i*size*1.15),size,font,color:PDFLib.rgb(rgb.r,rgb.g,rgb.b)})
+    })
+  }
+  const out=await pdfDoc.save();
+  downloadBlob(new Blob([out],{type:'application/pdf'}),makeFileName('filled','pdf'));
+  log('PDF 저장 완료')
+}
+
+async function exportImageAsPdf(){
+  log('PDF 생성 중...');
+  const pdfDoc=await PDFLib.PDFDocument.create();
+  const font=await getPdfFont(pdfDoc);
+  const p=state.pages[0];
+  const imgBytes=await state.imageBlob.arrayBuffer();
+  const img=state.imageBlob.type.includes('png')
+    ?await pdfDoc.embedPng(imgBytes):await pdfDoc.embedJpg(imgBytes);
+  // 이미지 PDF: 원본 이미지 크기를 페이지로
+  const pw=p.imgW||p.viewW, ph=p.imgH||p.viewH;
+  const page=pdfDoc.addPage([pw,ph]);
+  page.drawImage(img,{x:0,y:0,width:pw,height:ph});
+  // 이미지 파일은 scale 없이 뷰어 캔버스 = 이미지 그대로이므로
+  // viewW/imgW 비율로 역산
+  const scX=pw/p.viewW, scY=ph/p.viewH;
+  const TEXT_OFF_Y = getTextAnchorOffsetY(); // note-bar + body padding
+
+  for(const f of state.fields){
+    // ── 서명 이미지 (exportPdfOnOriginal과 동일한 object-fit:contain 방식) ──
+    if(f.type==='sign'&&f.imgData){
+      try{
+        const bodyRect=getNoteBodyRect(f);
+        const bx=bodyRect?bodyRect.x*scX:f.x*scX;
+        const by=bodyRect?bodyRect.y*scY:f.y*scY;
+        const bw=bodyRect?bodyRect.w*scX:(f.w||160)*scX;
+        const bh=bodyRect?bodyRect.h*scY:(f.h||70)*scY;
+        const {naturalWidth:iw,naturalHeight:ih}=await new Promise(res=>{
+          const im=new Image();im.onload=()=>res(im);im.src=f.imgData;
+        });
+        const{w:nw,h:nh,x:ox,y:oy}=getContainedImageRect(bw,bh,iw,ih);
+        const b64=f.imgData.split(',')[1];
+        const bin=atob(b64);const arr=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+        const isPng=f.imgData.startsWith('data:image/png');
+        const pdfImg=isPng?await pdfDoc.embedPng(arr):await pdfDoc.embedJpg(arr);
+        // PDF Y축 반전 (하단=0)
+        page.drawImage(pdfImg,{x:bx+ox,y:ph-(by+oy)-nh,width:nw,height:nh});
+      }catch(e){console.warn('서명 이미지 임베드 실패(이미지→PDF)',e)}
+      continue;
+    }
+
+    // ── 텍스트 / 체크 ──
+    if(!f.value)continue;
+    const rgb=hexToRgb(f.color);
+    // getNoteTextRect로 DOM 실측 우선 — PDF 저장, JPG 저장과 동일한 기준
+    const rect=getNoteTextRect(f);
+    const x=(rect?rect.x:f.x)*scX;
+    const sz=f.size*scY;
+    const textCanvasY=(rect?rect.y:(f.y+TEXT_OFF_Y))*scY;
+    const y=ph-textCanvasY-sz;
+    const lines=f.value.split('\n');
+    lines.forEach((line,i)=>{
+      if(!line)return;
+      page.drawText(line,{x,y:y-(i*sz*1.15),size:sz,font,color:PDFLib.rgb(rgb.r,rgb.g,rgb.b)})
+    })
+  }
+  const out=await pdfDoc.save();
+  downloadBlob(new Blob([out],{type:'application/pdf'}),makeFileName('filled','pdf'))
+}
+
+// ── JPG 저장 ──
+// v36: 화면 표시용 저해상도 canvas를 그대로 저장하지 않는다.
+// PDF는 저장 시 고해상도로 다시 렌더링하고, 필드 좌표/크기를 exportScale/displayScale 비율로 변환한다.
+$('exportImgBtn').onclick=async()=>{
+  if(!state.pages.length)return alert('파일을 먼저 열어주세요.');
+  const btn=$('exportImgBtn');
+  const sel=$('exportImgPageSelect');
+  const mode=sel?.value||'all';
+  let targetPages=[];
+
+  if(mode==='all'){
+    targetPages=[...state.pages];
+  } else if(mode==='visible'){
+    const p=getMostVisiblePage();
+    if(!p)return alert('현재 보이는 페이지를 찾지 못했습니다.');
+    targetPages=[p];
+  } else if(mode==='selected'){
+    const f=selected();
+    if(!f)return alert('선택된 필드가 없습니다. 먼저 저장하려는 쪽의 서명/필드를 클릭하거나, 저장 대상 버튼에서 쪽 번호를 직접 선택하세요.');
+    const pageNo=Number(f.page);
+    targetPages=state.pages.filter(p=>Number(p.page)===pageNo);
+  } else {
+    const pageNo=Number(mode);
+    targetPages=state.pages.filter(p=>Number(p.page)===pageNo);
+  }
+
+  if(!targetPages.length){
+    return alert(`저장할 페이지를 찾지 못했습니다. 현재 선택값: ${mode}`);
+  }
+
+  btn.disabled=true;
+  const pageLabel=targetPages.length===state.pages.length?'전체':targetPages.map(p=>p.page+'쪽').join(', ');
+  log('JPG 생성 중... '+pageLabel);
+  try{await document.fonts.ready}catch(e){}
+
+  try{
+    // 단일 페이지는 기존처럼 JPG 1개만 즉시 저장
+    if(targetPages.length===1){
+      const p=targetPages[0];
+      const out=await renderPageToCanvas(p);
+      const blob=await new Promise(res=>out.toBlob(res,'image/jpeg',0.98));
+      if(!blob)throw new Error('JPG Blob 생성 실패');
+      const suffix=state.pages.length>1?`_p${p.page}`:'';
+      downloadBlob(blob,makeFileName('filled'+suffix,'jpg'));
+      log('JPG 저장 완료 — '+p.page+'쪽');
+      return;
+    }
+
+    // 여러 페이지는 브라우저가 연속 다운로드를 막아 1쪽만 저장되는 경우가 있어 ZIP 1개로 저장
+    if(window.JSZip){
+      const zip=new JSZip();
+      const base=baseName();
+      for(const p of targetPages){
+        const out=await renderPageToCanvas(p);
+        const blob=await new Promise(res=>out.toBlob(res,'image/jpeg',0.98));
+        if(!blob)continue;
+        zip.file(`${base}_filled_p${p.page}.jpg`,blob);
+      }
+      const zipBlob=await zip.generateAsync({type:'blob'});
+      downloadBlob(zipBlob,makeFileName('filled_pages','zip'));
+      log('JPG 저장 완료 — ZIP 1개로 저장됨');
+    } else {
+      // JSZip 로드 실패 시 폴백. 일부 브라우저는 첫 파일만 받을 수 있음.
+      for(let i=0;i<targetPages.length;i++){
+        const p=targetPages[i];
+        const out=await renderPageToCanvas(p);
+        const blob=await new Promise(res=>out.toBlob(res,'image/jpeg',0.98));
+        if(!blob)continue;
+        downloadBlob(blob,makeFileName(`filled_p${p.page}`,'jpg'));
+        if(i<targetPages.length-1)await new Promise(r=>setTimeout(r,700));
+      }
+      log('JPG 저장 완료 — 여러 파일 다운로드 허용 여부를 브라우저에서 확인하세요');
+    }
+  } catch(err){
+    console.error(err);
+    alert('JPG 저장 중 오류: '+(err?.message||err));
+    log('JPG 저장 실패');
+  } finally {
+    btn.disabled=false;
+  }
+};
+
+// 포스트잇 note-input 엘리먼트의 overlay 기준 실제 픽셀 좌표를 측정
+function getNoteTextRect(f){
+  const p = state.pages[f.page-1]; if(!p) return null;
+  const noteEl = p.overlay.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+  const inpEl  = noteEl?.querySelector('.note-input');
+  if(!noteEl||!inpEl) return null;
+  const overlayRect = p.overlay.getBoundingClientRect();
+  const inpRect     = inpEl.getBoundingClientRect();
+  return {
+    x: inpRect.left - overlayRect.left,
+    y: inpRect.top  - overlayRect.top,
+  };
+}
+
+async function renderPageToCanvas(p){
+  // PDF: 화면용 canvas가 아니라 저장용 고해상도 canvas를 별도로 생성한다.
+  if(state.kind==='pdf'&&state.pdf){
+    return await renderPdfPageToCanvasForJpg(p);
+  }
+  // 이미지 입력: 원본 이미지 크기가 있으면 원본 기준으로 저장한다.
+  if(state.kind==='image'&&state.imageBlob&&p.imgW&&p.imgH){
+    return await renderImagePageToCanvasForJpg(p);
+  }
+  // 폴백: 기존 화면 canvas 복사
+  return await renderDisplayCanvasWithFields(p,1,1);
+}
+
+async function renderPdfPageToCanvasForJpg(p){
+  const exportScale=getJpgExportScale(p);
+  const displayScale=Number(p.scale||state.scale||1);
+  const k=exportScale/displayScale;
+
+  const pdfPage=await state.pdf.getPage(p.page);
+  const viewport=pdfPage.getViewport({scale:exportScale});
+  const out=document.createElement('canvas');
+  out.width=Math.floor(viewport.width);
+  out.height=Math.floor(viewport.height);
+  const ctx=out.getContext('2d',{alpha:false});
+  ctx.save();
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,out.width,out.height);
+  ctx.restore();
+  await pdfPage.render({canvasContext:ctx,viewport}).promise;
+
+  await drawFieldsOnExportCanvas(ctx,p,k,k);
+  return out;
+}
+
+async function renderImagePageToCanvasForJpg(p){
+  const img=await new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(state.imageBlob);
+    const im=new Image();
+    im.onload=()=>{URL.revokeObjectURL(url);resolve(im)};
+    im.onerror=e=>{URL.revokeObjectURL(url);reject(e)};
+    im.src=url;
+  });
+  const out=document.createElement('canvas');
+  out.width=p.imgW||img.naturalWidth||p.viewW;
+  out.height=p.imgH||img.naturalHeight||p.viewH;
+  const ctx=out.getContext('2d',{alpha:false});
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,out.width,out.height);
+  ctx.drawImage(img,0,0,out.width,out.height);
+  await drawFieldsOnExportCanvas(ctx,p,out.width/p.viewW,out.height/p.viewH);
+  return out;
+}
+
+async function renderDisplayCanvasWithFields(p,kx=1,ky=1){
+  const src=p.canvas;
+  const out=document.createElement('canvas');
+  out.width=Math.round(src.width*kx); out.height=Math.round(src.height*ky);
+  const ctx=out.getContext('2d',{alpha:false});
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,out.width,out.height);
+  ctx.drawImage(src,0,0,out.width,out.height);
+  await drawFieldsOnExportCanvas(ctx,p,kx,ky);
+  return out;
+}
+
+async function drawFieldsOnExportCanvas(ctx,p,kx,ky){
+  const fields=state.fields.filter(f=>f.page===p.page&&(f.value||f.imgData));
+  if(!fields.length)return;
+
+  // 서명 이미지 먼저 그리기
+  const signFields=fields.filter(f=>f.type==='sign'&&f.imgData);
+  await Promise.all(signFields.map(f=>new Promise(res=>{
+    const bodyRect=getNoteBodyRect(f);
+    const bx=bodyRect?bodyRect.x:f.x;
+    const by=bodyRect?bodyRect.y:f.y;
+    const bw=bodyRect?bodyRect.w:(f.w||160);
+    const bh=bodyRect?bodyRect.h:(f.h||70);
+    const img=new Image();
+    img.onload=()=>{
+      // object-fit:contain — getContainedImageRect 공통 유틸 사용
+      const{w:nw,h:nh,x:ox,y:oy}=getContainedImageRect(bw*kx,bh*ky,img.naturalWidth,img.naturalHeight);
+      ctx.drawImage(img,bx*kx+ox,by*ky+oy,nw,nh);
+      res();
+    };
+    img.onerror=()=>res();
+    img.src=f.imgData;
+  })));
+
+  // 텍스트/체크 필드
+  fields.filter(f=>f.type!=='sign'&&f.value).forEach(f=>{
+    const rect=getNoteTextRect(f);
+    const tx=(rect?rect.x:f.x)*kx;
+    const ty=(rect?rect.y:f.y+getTextAnchorOffsetY())*ky;
+    const lines=f.value.split('\n');
+    const sz=f.size*ky;
+    ctx.save();
+    ctx.font=`${sz}px 'Nanum Gothic','Malgun Gothic',system-ui,sans-serif`;
+    ctx.fillStyle=f.color||'#111111';
+    ctx.textBaseline='top';
+    if(f.scaleX&&f.scaleX!==100){
+      const sx=f.scaleX/100;
+      ctx.scale(sx,1);
+      lines.forEach((line,i)=>{if(line)ctx.fillText(line,tx/sx,ty+i*sz*1.15)});
+    }else{
+      lines.forEach((line,i)=>{if(line)ctx.fillText(line,tx,ty+i*sz*1.15)});
+    }
+    ctx.restore();
+  });
+}
+
+</script>
+</body>
+</html>
