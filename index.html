@@ -248,6 +248,11 @@ canvas.page-canvas{display:block}
 #signCanvas{border:1.5px solid var(--border);border-radius:8px;cursor:crosshair;display:block;background:#fff;touch-action:none}
 .sign-canvas-wrap{position:relative}
 .sign-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:13px;color:var(--text-light);pointer-events:none;text-align:center;line-height:1.6}
+
+.sign-save-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--border-light);border-radius:8px;background:#f8fafc}
+.sign-save-tools .btn{font-size:12px;padding:5px 9px}
+.sign-saved-info{font-size:11px;color:var(--text-muted);line-height:1.4;flex-basis:100%}
+
 /* ── 모달 ── */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal-bg.hidden{display:none}
@@ -715,6 +720,14 @@ body.preview-mode .overlay .note.empty:hover{
       <div id="signImgPreview" style="display:none;margin-top:10px;text-align:center">
         <img id="signPreviewImg" style="max-width:100%;max-height:160px;border-radius:6px;border:1px solid var(--border)">
       </div>
+    </div>
+
+    <div class="sign-save-tools">
+      <button class="btn sm" id="signSaveBrowserBtn" title="현재 그린 서명 또는 업로드한 서명을 브라우저에 저장">💾 서명 저장</button>
+      <button class="btn sm" id="signLoadBrowserBtn" title="브라우저에 저장된 서명을 불러오기">📂 저장서명 불러오기</button>
+      <button class="btn sm" id="signDownloadBtn" title="현재 서명을 PNG 파일로 저장">⬇ PNG 저장</button>
+      <button class="btn sm danger" id="signClearSavedBtn" title="브라우저에 저장된 서명 삭제">🗑 저장서명 삭제</button>
+      <div id="signSavedInfo" class="sign-saved-info">저장된 서명 없음</div>
     </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
@@ -2197,6 +2210,57 @@ let _signTarget=null; // 기존 서명 필드 수정 시
 let _signImgDataUrl=''; // 업로드 이미지 dataURL
 let _signDrawn=false;
 
+const SIGN_LS_KEY='formStamperSavedSignatureV1';
+
+function dataUrlToBlob(dataUrl){
+  const [head,body]=String(dataUrl||'').split(',');
+  const mime=(head.match(/data:([^;]+)/)||[])[1]||'image/png';
+  const bin=atob(body||'');
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+
+function getCurrentSignatureDataUrl(silent=false){
+  const activeTab=document.querySelector('.sign-tab.active')?.dataset.stab;
+  if(activeTab==='draw'){
+    if(!_signDrawn){
+      if(!silent)alert('저장할 서명을 먼저 그려주세요.');
+      return '';
+    }
+    return $('signCanvas').toDataURL('image/png');
+  }
+  if(!_signImgDataUrl){
+    if(!silent)alert('저장할 서명 이미지를 먼저 불러오세요.');
+    return '';
+  }
+  return _signImgDataUrl;
+}
+
+function updateSignSavedInfo(){
+  const el=$('signSavedInfo');if(!el)return;
+  const s=localStorage.getItem(SIGN_LS_KEY);
+  if(!s){el.textContent='저장된 서명 없음';return;}
+  try{
+    const o=JSON.parse(s);
+    el.textContent='저장된 서명: '+(o.savedAt||'?')+' · '+Math.round((o.dataUrl||'').length/1024)+'KB';
+  }catch{
+    el.textContent='저장된 서명 있음';
+  }
+}
+
+function applySignatureDataToUploadPanel(dataUrl){
+  if(!dataUrl)return;
+  _signImgDataUrl=dataUrl;
+  $('signPreviewImg').src=dataUrl;
+  $('signImgPreview').style.display='';
+  document.querySelectorAll('.sign-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sign-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('.sign-tab[data-stab="upload"]').classList.add('active');
+  $('stab-upload').classList.add('active');
+}
+
+
 function openSignModal(existingField){
   _signTarget=existingField||null;
   _signImgDataUrl='';_signDrawn=false;
@@ -2212,6 +2276,7 @@ function openSignModal(existingField){
   document.querySelector('.sign-tab[data-stab="draw"]').classList.add('active');
   $('stab-draw').classList.add('active');
   $('signModalBg').classList.remove('hidden');
+  updateSignSavedInfo();
   // 모바일: 모달 열린 동안 배경 스크롤/터치 스크롤 완전 차단
   document.body.classList.add('modal-open');
   initSignCanvas();
@@ -2302,6 +2367,52 @@ $('signDropZone').onclick=()=>$('signImgInput').click();
 $('signDropZone').ondragover=e=>{e.preventDefault();$('signDropZone').style.borderColor='var(--accent)'};
 $('signDropZone').ondragleave=()=>{$('signDropZone').style.borderColor='var(--border)'};
 $('signDropZone').ondrop=e=>{e.preventDefault();$('signDropZone').style.borderColor='var(--border)';handleSignImg(e.dataTransfer.files[0])};
+
+
+// 서명 단독 저장/불러오기
+$('signSaveBrowserBtn')?.addEventListener('click',()=>{
+  const dataUrl=getCurrentSignatureDataUrl(false);
+  if(!dataUrl)return;
+  try{
+    localStorage.setItem(SIGN_LS_KEY,JSON.stringify({version:1,savedAt:new Date().toLocaleString('ko-KR'),dataUrl}));
+    updateSignSavedInfo();
+    log('서명 저장 완료 — 다음 서명 추가 때 불러올 수 있습니다.');
+  }catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22){
+      alert('브라우저 저장 용량을 초과했습니다. [PNG 저장]으로 파일 저장 후 이미지 업로드를 이용해 주세요.');
+      log('서명 저장 실패 — 용량 초과');
+    }else{throw e;}
+  }
+});
+
+$('signLoadBrowserBtn')?.addEventListener('click',()=>{
+  const s=localStorage.getItem(SIGN_LS_KEY);
+  if(!s)return alert('브라우저에 저장된 서명이 없습니다.');
+  try{
+    const o=JSON.parse(s);
+    if(!o.dataUrl)throw new Error('dataUrl 없음');
+    applySignatureDataToUploadPanel(o.dataUrl);
+    log('저장된 서명 불러오기 완료 — [서명 삽입]을 누르면 배치됩니다.');
+  }catch(e){
+    alert('저장된 서명 데이터가 손상되었습니다. 삭제 후 다시 저장하세요.');
+  }
+});
+
+$('signDownloadBtn')?.addEventListener('click',()=>{
+  const dataUrl=getCurrentSignatureDataUrl(false);
+  if(!dataUrl)return;
+  const blob=dataUrlToBlob(dataUrl);
+  downloadBlob(blob,makeFileName('signature','png'));
+  log('서명 PNG 저장 완료');
+});
+
+$('signClearSavedBtn')?.addEventListener('click',()=>{
+  if(!localStorage.getItem(SIGN_LS_KEY))return alert('삭제할 저장 서명이 없습니다.');
+  if(!confirm('브라우저에 저장된 서명을 삭제할까요?'))return;
+  localStorage.removeItem(SIGN_LS_KEY);
+  updateSignSavedInfo();
+  log('저장된 서명 삭제 완료');
+});
 
 // 취소
 $('signCancelBtn').onclick=()=>closeSignModal();
