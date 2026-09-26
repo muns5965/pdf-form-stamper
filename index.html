@@ -29,7 +29,14 @@ body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(-
 
 /* ── 상단바 ── */
 .topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;background:var(--white);border-bottom:1px solid var(--border);flex-shrink:0;z-index:40}
-.topbar-logo{font-weight:700;font-size:15px;letter-spacing:-.3px;color:var(--accent);white-space:nowrap}
+.topbar-logo{font-weight:700;font-size:15px;letter-spacing:-.3px;color:var(--accent);white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.drag-debug-panel{position:fixed;right:12px;bottom:12px;z-index:10000;width:min(390px,calc(100vw - 24px));max-height:min(50vh,360px);display:flex;flex-direction:column;gap:6px;padding:10px;background:rgba(15,23,42,.96);color:#fff;border-radius:9px;box-shadow:0 5px 25px #0005;font:11px/1.4 monospace;overflow:hidden}
+.drag-debug-panel[hidden]{display:none!important}
+.drag-debug-header{display:flex;align-items:center;gap:6px;font:700 12px/1.4 sans-serif}
+.drag-debug-header strong{flex:1}
+.drag-debug-header button{padding:3px 7px;border:1px solid #64748b;border-radius:4px;background:#334155;color:#fff;font:inherit}
+.drag-debug-status{white-space:pre-wrap;word-break:break-word}
+.drag-debug-log{min-height:50px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#cbd5e1;border-top:1px solid #475569;padding-top:5px;user-select:text;-webkit-user-select:text}
 .topbar-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
 .topbar-right{display:flex;gap:8px;align-items:center;margin-left:auto}
 .upload-btn{position:relative;overflow:hidden;cursor:pointer}
@@ -490,7 +497,7 @@ body.preview-mode .overlay .note.empty:hover{
 
 <!-- 상단바 -->
 <div class="topbar">
-  <div class="topbar-logo">📝 서식 입력기</div>
+  <div class="topbar-logo" id="debugTitle">📝 서식 입력기</div>
   <div class="topbar-sep"></div>
   <div class="upload-btn btn">
     📂 파일 열기
@@ -614,6 +621,7 @@ body.preview-mode .overlay .note.empty:hover{
     <!-- 상태바 -->
     <div class="status-bar" id="statusBar">
       <div class="status-line"><span id="statusText">준비</span></div>
+      <div id="dprInfo" style="display:none;font-size:10px;white-space:normal;word-break:break-word"></div>
       <div id="selectedMiniBar" class="selected-mini hidden">
         <div style="display:flex;gap:6px;align-items:center;min-width:0"><div id="selectedMiniInfo" class="selected-mini-info" style="flex:1;min-width:0"></div><span class="focus-mode-hint">선택 집중</span></div>
         <div class="selected-mini-actions">
@@ -643,6 +651,11 @@ body.preview-mode .overlay .note.empty:hover{
 </div>
 
 <!-- 좌표 디버그 옵션 (숨김, 우클릭 메뉴로 접근 가능) -->
+<div id="dragDebugPanel" class="drag-debug-panel" hidden aria-label="드래그 진단 패널">
+  <div class="drag-debug-header"><strong>드래그 진단</strong><button type="button" id="dragDebugCopy">복사</button><button type="button" id="dragDebugClose">닫기</button></div>
+  <div id="dragDebugStatus" class="drag-debug-status">입력창을 터치해 상태를 확인하세요.</div>
+  <div id="dragDebugLog" class="drag-debug-log"></div>
+</div>
 <div id="advModal" class="modal-bg hidden">
   <div class="modal">
     <h3>⚙️ 고급 설정</h3>
@@ -963,9 +976,11 @@ async function loadFile(file){
   const keepFields=state.fields.length>0&&confirm('기존 입력값/필드를 유지할까요?\n(취소하면 초기화됩니다)');
   const savedFields=keepFields?[...state.fields]:[];
 
+  releasePageCanvases();
   state.kind=file.type==='application/pdf'?'pdf':'image';
   state.fileName=file.name;
-  state.fields=savedFields;state.selectedId=null;state.pages=[];state.pdf=null;state.imageBlob=null;
+  state.fields=savedFields;state.selectedId=null;state.pages=[];state.pdf=null;state.imageBlob=null;state.lowResolutionLocked=false;
+  $('dprInfo').style.display='none';$('dprInfo').textContent='';
   $('fileName').textContent=file.name;
   viewerMessage('⏳','파일을 불러오는 중입니다.','모바일에서는 PDF 렌더링에 시간이 걸릴 수 있습니다.');
   log('파일 로드 중...');
@@ -984,9 +999,11 @@ async function loadFile(file){
     log(`${file.name} 로드 완료`);
   }catch(err){
     console.error(err);
+    releasePageCanvases();
     state.pages=[];state.pdf=null;
     updateJpgPageSelect?.();
-    const detail=`오류: ${formatErr(err)}<br><br>대응: Chrome/삼성인터넷에서 다시 열거나, 외부 CDN이 차단되는 환경이면 pdf.js/pdf.worker를 로컬 파일로 포함해야 합니다.`;
+    const guidance=err?.renderFailure?'페이지 렌더링에 실패했습니다. 다른 브라우저에서 열거나 페이지 수가 적은 파일로 다시 시도해 주세요.':'Chrome/삼성인터넷에서 다시 열거나, 외부 CDN이 차단되는 환경이면 pdf.js/pdf.worker를 로컬 파일로 포함해야 합니다.';
+    const detail=`오류: ${esc(formatErr(err))}<br><br>대응: ${guidance}`;
     viewerMessage('⚠️','PDF를 불러오지 못했습니다.',detail);
     log('PDF 로드 실패');
   }
@@ -1021,10 +1038,71 @@ $('fileInput').addEventListener('change',async e=>{
 }
 
 // ── PDF 렌더 ──
+// 표시 좌표(CSS px)와 canvas 내부 픽셀은 별도로 관리한다.
+const DISPLAY_PIXEL_BUDGET={mobile:9000000,desktop:16000000,fileMobile:50000000,fileDesktop:80000000};
+const DPR_PARAM=new URLSearchParams(location.search).get('dpr');
+const DPR_DIAGNOSTIC=['1','2','3'].includes(DPR_PARAM);
+const REQUESTED_DISPLAY_K=DPR_DIAGNOSTIC?Number(DPR_PARAM):Math.min(Number(window.devicePixelRatio)||1,2);
+function bitmapPixels(w,h,k){return Math.round(w*k)*Math.round(h*k)}
+function displayBudget(){
+  return isMobileViewport()
+    ?{page:DISPLAY_PIXEL_BUDGET.mobile,file:DISPLAY_PIXEL_BUDGET.fileMobile}
+    :{page:DISPLAY_PIXEL_BUDGET.desktop,file:DISPLAY_PIXEL_BUDGET.fileDesktop};
+}
+function displayScaleForSize(w,h,requested,pageBudget){
+  if(w<=0||h<=0)throw new Error('페이지 크기가 올바르지 않습니다.');
+  // 1배에서도 예산을 넘으면 현행 해상도를 유지한다.
+  if(bitmapPixels(w,h,1)>=pageBudget)return 1;
+  let k=Math.max(1,Math.min(requested,Math.sqrt(pageBudget/(w*h))));
+  while(k>1&&bitmapPixels(w,h,k)>pageBudget)k=Math.max(1,k-0.0001);
+  return k;
+}
+function displayPlan(sizes,requested=REQUESTED_DISPLAY_K){
+  const budget=displayBudget(),totalArea=sizes.reduce((n,p)=>n+p.w*p.h,0);
+  const fileK=Math.max(1,Math.min(requested,Math.sqrt(budget.file/totalArea)));
+  const scales=sizes.map(p=>displayScaleForSize(p.w,p.h,fileK,budget.page));
+  let total=sizes.reduce((n,p,i)=>n+bitmapPixels(p.w,p.h,scales[i]),0);
+  // 반올림 후 실제 크기의 합계를 검사한다. 1배 자체가 초과하는 파일은 예외.
+  while(total>budget.file&&scales.some(k=>k>1)){
+    for(let i=0;i<scales.length;i++)if(scales[i]>1)scales[i]=Math.max(1,scales[i]-0.0001);
+    total=sizes.reduce((n,p,i)=>n+bitmapPixels(p.w,p.h,scales[i]),0);
+  }
+  return {scales,fileK,total,budget,overBudget:total>budget.file};
+}
+function showDprInfo(parts){
+  if(!DPR_DIAGNOSTIC)return;
+  const el=$('dprInfo');el.style.display='block';el.textContent=parts.join(' | ');
+}
+function releaseCanvas(canvas){if(canvas){canvas.width=0;canvas.height=0}}
+function releasePageCanvases(){for(const p of state.pages||[])releaseCanvas(p.canvas)}
+function renderError(error){
+  const wrapped=new Error(String(error?.message||error));wrapped.renderFailure=true;wrapped.cause=error;
+  return wrapped;
+}
+async function renderPageBitmap({kind,pdfPage,img,viewport,cssW,cssH,k}){
+  const canvas=document.createElement('canvas');canvas.className='page-canvas';
+  canvas.width=Math.round(cssW*k);canvas.height=Math.round(cssH*k);
+  canvas.style.width=cssW+'px';canvas.style.height=cssH+'px';
+  try{
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)throw new Error('canvas 2D 컨텍스트를 만들 수 없습니다.');
+    if(kind==='pdf')await pdfPage.render({canvasContext:ctx,viewport,transform:[k,0,0,k,0,0]}).promise;
+    else ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    return canvas;
+  }catch(error){releaseCanvas(canvas);throw renderError(error)}
+}
+function appendPage({i,canvas,viewport,scale,pdfW,pdfH,imgW,imgH,k}){
+  const wrap=document.createElement('div');wrap.className='page-wrap';wrap.dataset.page=i;
+  const lbl=document.createElement('div');lbl.className='page-label';lbl.textContent=i+'쪽';
+  const overlay=document.createElement('div');overlay.className='overlay';
+  wrap.append(lbl,canvas,overlay);installOverlayClick(overlay,i);
+  $('viewer').appendChild(wrap);
+  state.pages.push({page:i,wrap,canvas,overlay,pdfW,pdfH,viewW:viewport.width,viewH:viewport.height,
+    ...(imgW?{imgW,imgH}:{}),scale,displayK:k});
+}
 async function renderPdf(){
   const pdfjs=await ensurePdfJs();
   $('viewer').innerHTML='';
-
   let loadingTask=null;
   try{
     loadingTask=pdfjs.getDocument({data:state.bytes.slice(0)});
@@ -1034,47 +1112,78 @@ async function renderPdf(){
     try{
       loadingTask=pdfjs.getDocument({data:state.bytes.slice(0),disableWorker:true});
       state.pdf=await loadingTask.promise;
-    }catch(e2){
-      throw new Error('PDF 파싱/렌더링 실패: '+String(e2?.message||e2));
-    }
+    }catch(e2){throw new Error('PDF 파싱/렌더링 실패: '+String(e2?.message||e2))}
   }
 
+  // 파일 전체 canvas 예산을 먼저 계산한다. 메타데이터는 렌더링에도 재사용한다.
+  const info=[];
   for(let i=1;i<=state.pdf.numPages;i++){
-    log(`PDF 렌더링 중... ${i}/${state.pdf.numPages}쪽`);
     const page=await state.pdf.getPage(i);
-    const scale=getRenderScaleForPage(page);
-    const viewport=page.getViewport({scale});
-    const wrap=document.createElement('div');wrap.className='page-wrap';wrap.dataset.page=i;
-    const lbl=document.createElement('div');lbl.className='page-label';lbl.textContent=i+'쪽';
-    const canvas=document.createElement('canvas');canvas.className='page-canvas';
-    canvas.width=Math.floor(viewport.width);canvas.height=Math.floor(viewport.height);
-    const ctx=canvas.getContext('2d',{alpha:false});
-    await page.render({canvasContext:ctx,viewport}).promise;
-    const overlay=document.createElement('div');overlay.className='overlay';
-    wrap.append(lbl,canvas,overlay);installOverlayClick(overlay,i);
-    $('viewer').appendChild(wrap);
-    const raw=page.getViewport({scale:1});
-    state.pages.push({page:i,wrap,canvas,overlay,pdfW:raw.width,pdfH:raw.height,viewW:canvas.width,viewH:canvas.height,scale});
-    await new Promise(r=>setTimeout(r,0));
+    const scale=getRenderScaleForPage(page),viewport=page.getViewport({scale});
+    info.push({page,scale,viewport,cssW:Math.floor(viewport.width),cssH:Math.floor(viewport.height),
+      raw:page.getViewport({scale:1})});
   }
+  const plan=displayPlan(info.map(p=>({w:p.cssW,h:p.cssH})));
+  let fallbackPages=[],globalFallback=false;
+  async function renderAllPages(lowResolution){
+    for(let index=0;index<info.length;index++){
+      const p=info[index],i=index+1;
+      log(`PDF 렌더링 중... ${i}/${info.length}쪽`);
+      let k=lowResolution?1:plan.scales[index],canvas;
+      try{
+        canvas=await renderPageBitmap({kind:'pdf',pdfPage:p.page,viewport:p.viewport,cssW:p.cssW,cssH:p.cssH,k});
+      }catch(firstError){
+        if(k===1)throw firstError;
+        fallbackPages.push(i);k=1;
+        canvas=await renderPageBitmap({kind:'pdf',pdfPage:p.page,viewport:p.viewport,cssW:p.cssW,cssH:p.cssH,k});
+      }
+      appendPage({i,canvas,viewport:{width:p.cssW,height:p.cssH},scale:p.scale,
+        pdfW:p.raw.width,pdfH:p.raw.height,k});
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  try{await renderAllPages(false)}
+  catch(err){
+    // 앞쪽의 고해상도 canvas도 해제해야 낮은 배율 재시도가 의미 있다.
+    globalFallback=true;releasePageCanvases();state.pages=[];$('viewer').innerHTML='';
+    try{await renderAllPages(true)}catch(lowErr){throw renderError(lowErr)}
+  }
+  showDprInfo([`요청 ${REQUESTED_DISPLAY_K.toFixed(2)}배`,`파일 예산 ${plan.fileK.toFixed(2)}배`,
+    ...state.pages.map(p=>`${p.page}쪽 ${p.displayK.toFixed(2)}배 ${p.canvas.width}×${p.canvas.height}`),
+    plan.overBudget?'1배 예산 초과':'',fallbackPages.length?`쪽별 1배 재시도: ${[...new Set(fallbackPages)].join(',')}`:'',
+    globalFallback?'전체 1배 고정':''].filter(Boolean));
+  state.lowResolutionLocked=globalFallback;
 }
 async function renderImage(file){
   const url=URL.createObjectURL(file);
-  try{const img=new Image();img.src=url;await img.decode();
-  const viewer=$('viewer');
-  const maxW=isMobileViewport()?Math.max(280,(viewer?.clientWidth||window.innerWidth||360)-24):1000;
-  const ratio=img.width>maxW?maxW/img.width:1;
-  const wrap=document.createElement('div');wrap.className='page-wrap';wrap.dataset.page=1;
-  const lbl=document.createElement('div');lbl.className='page-label';lbl.textContent='1쪽';
-  const canvas=document.createElement('canvas');canvas.className='page-canvas';
-  canvas.width=Math.round(img.width*ratio);canvas.height=Math.round(img.height*ratio);
-  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-  const overlay=document.createElement('div');overlay.className='overlay';
-  wrap.append(lbl,canvas,overlay);installOverlayClick(overlay,1);
-  $('viewer').appendChild(wrap);
-  state.imageBlob=file;
-  state.pages.push({page:1,wrap,canvas,overlay,pdfW:canvas.width,pdfH:canvas.height,viewW:canvas.width,viewH:canvas.height,imgW:img.width,imgH:img.height,scale:ratio});
-  }finally{URL.revokeObjectURL(url);}
+  try{
+    const img=new Image();img.src=url;await img.decode();
+    $('viewer').innerHTML='';
+    const viewer=$('viewer');
+    const maxW=isMobileViewport()?Math.max(280,(viewer?.clientWidth||window.innerWidth||360)-24):1000;
+    const ratio=img.width>maxW?maxW/img.width:1;
+    const cssW=Math.round(img.width*ratio),cssH=Math.round(img.height*ratio);
+    const plan=displayPlan([{w:cssW,h:cssH}]);
+    const sourceLimit=Math.min(img.width/cssW,img.height/cssH);
+    let k=Math.max(1,Math.min(plan.scales[0],sourceLimit));
+    // 원본 크기와 목표치를 모두 반올림 후 확인한다.
+    while(k>1&&(Math.round(cssW*k)>img.width||Math.round(cssH*k)>img.height))k=Math.max(1,k-0.0001);
+    let canvas,fallback=false;
+    try{canvas=await renderPageBitmap({kind:'image',img,cssW,cssH,k})}
+    catch(err){
+      if(k===1)throw err;
+      fallback=true;k=1;
+      canvas=await renderPageBitmap({kind:'image',img,cssW,cssH,k});
+    }
+    appendPage({i:1,canvas,viewport:{width:cssW,height:cssH},scale:ratio,
+      pdfW:cssW,pdfH:cssH,imgW:img.width,imgH:img.height,k});
+    state.imageBlob=file;
+    showDprInfo([`요청 ${REQUESTED_DISPLAY_K.toFixed(2)}배`,`파일 예산 ${plan.fileK.toFixed(2)}배`,
+      `적용 ${k.toFixed(2)}배 ${canvas.width}×${canvas.height}`,`원본 ${img.width}×${img.height}`,
+      plan.overBudget?'1배 예산 초과':'',fallback?'이미지 1배 재시도':''].filter(Boolean));
+    state.lowResolutionLocked=fallback;
+  }catch(err){throw renderError(err)}
+  finally{URL.revokeObjectURL(url)}
 }
 
 function updateJpgPageSelect(){
@@ -1554,6 +1663,49 @@ function buildNote(f){
 // 필드 수만큼 이벤트 호출이 쌓여 모바일에서 심각한 성능 저하가 발생한다.
 // 전역 Map에 핸들러를 등록하고 document 레벨에서는 단 1회만 바인딩한다.
 const _noteDragHandlers = new Map(); // el → {onMove, onUp}
+const dragDebug={enabled:false,taps:0,lastTap:0,lines:[],active:null};
+let lastTitlePointerType='mouse';
+$('debugTitle').addEventListener('pointerdown',ev=>{lastTitlePointerType=ev.pointerType});
+function dragDebugTarget(target){
+  if(target?.closest?.('.note-resize,.note-resize-w'))return '크기 조절점';
+  if(target?.closest?.('.note-input'))return '글자 영역';
+  if(target?.closest?.('.note-bar'))return '상단 손잡이';
+  return '입력창 기타';
+}
+function dragDebugShow(message,record=false){
+  if(!dragDebug.enabled)return;
+  if(record){
+    dragDebug.lines.push(`${new Date().toLocaleTimeString('ko-KR')} ${message}`);
+    if(dragDebug.lines.length>30)dragDebug.lines.shift();
+    const logEl=$('dragDebugLog');logEl.textContent=dragDebug.lines.join('\n');logEl.scrollTop=logEl.scrollHeight;
+  }
+  $('dragDebugStatus').textContent=message;
+}
+function dragDebugToggle(){
+  dragDebug.enabled=!dragDebug.enabled;
+  $('dragDebugPanel').hidden=!dragDebug.enabled;
+  dragDebug.active=null;
+  if(dragDebug.enabled)dragDebugShow('대기 중 · 입력창을 터치해 상태를 확인하세요.',true);
+}
+// 제목에서 발생한 click만 센다. 다른 버튼이나 이동 중 탭은 누적하지 않는다.
+$('debugTitle').addEventListener('click',ev=>{
+  if(ev.detail===0)return;
+  const now=performance.now();
+  dragDebug.taps=now-dragDebug.lastTap<=3000?dragDebug.taps+1:1;
+  dragDebug.lastTap=now;
+  if(dragDebug.taps>=5){dragDebug.taps=0;dragDebugToggle()}
+});
+$('dragDebugClose').addEventListener('click',()=>{dragDebug.enabled=false;dragDebug.active=null;$('dragDebugPanel').hidden=true});
+$('dragDebugCopy').addEventListener('click',async()=>{
+  const report=['드래그 진단',`상태: ${$('dragDebugStatus').textContent}`,...dragDebug.lines].join('\n');
+  try{await navigator.clipboard.writeText(report);$('dragDebugCopy').textContent='복사됨'}
+  catch(e){
+    const selection=window.getSelection(),range=document.createRange();
+    range.selectNodeContents($('dragDebugLog'));selection.removeAllRanges();selection.addRange(range);
+    $('dragDebugCopy').textContent='로그 선택됨';
+  }
+  setTimeout(()=>$('dragDebugCopy').textContent='복사',1800);
+});
 document.addEventListener('pointermove', ev=>{
   for(const {onMove} of _noteDragHandlers.values()) onMove(ev);
 },{passive:false});
@@ -1582,9 +1734,15 @@ function installNoteDrag(el,bar,body,f){
     // inp(contentEditable) 클릭 시: 선택만, 스탬프 재빌드 없이
     const onInp=ev.target.classList.contains('note-input')||
                 ev.target.closest('.note-input');
+    if(dragDebug.enabled){
+      dragDebug.active={id:f.id,pointerId:ev.pointerId,moves:0,startX:ev.clientX,startY:ev.clientY,target:dragDebugTarget(ev.target)};
+      dragDebugShow(`시작 · ${dragDebug.active.target} · ${ev.pointerType} #${ev.pointerId}\np${f.page} x:${f.x} y:${f.y}`,true);
+    }
     selectField(f.id, true); // skipStampRebuild=true
     if(onInp && !state.previewMode){
       // 편집 모드: 텍스트 영역 클릭은 선택만, 드래그 안 함 (텍스트 편집 허용)
+      dragDebugShow('드래그 차단 · 글자 영역은 편집용 · 상단 손잡이를 사용하세요.',true);
+      dragDebug.active=null;
       active=false; return;
     }
     // 미리보기 모드에서 note-input 위 클릭 시:
@@ -1598,6 +1756,7 @@ function installNoteDrag(el,bar,body,f){
     pid=ev.pointerId;
     active=true; dragging=false;
     try{el.setPointerCapture?.(pid)}catch(e){}
+    dragDebugShow(`드래그 준비 · ${dragDebugTarget(ev.target)} · ${ev.pointerType} #${pid}`,true);
     document.body.classList.add('note-dragging');
   }
 
@@ -1605,6 +1764,7 @@ function installNoteDrag(el,bar,body,f){
   function onMove(ev){
     if(!active||ev.pointerId!==pid)return;
     const dx=ev.clientX-sx, dy=ev.clientY-sy;
+    if(dragDebug.enabled&&dragDebug.active?.pointerId===pid)dragDebug.active.moves++;
     if(!dragging){
       if(Math.hypot(dx,dy)<THRESHOLD)return;
       // 드래그 확정 — threshold 통과 시점에 snapshot (단순 클릭은 저장 안 함)
@@ -1614,6 +1774,7 @@ function installNoteDrag(el,bar,body,f){
       if(inp)inp.style.pointerEvents='none'; // 텍스트영역 이벤트 차단
       el.style.cursor='grabbing';
       dragging=true;
+      dragDebugShow(`드래그 시작 · ${dragDebug.active?.target||'입력창'} · 이동 ${Math.round(dx)},${Math.round(dy)}`,true);
     }
     ev.preventDefault?.();
     f.x=Math.max(0,Math.round(ox+dx));
@@ -1621,12 +1782,14 @@ function installNoteDrag(el,bar,body,f){
     el.style.left=f.x+'px';
     el.style.top=f.y+'px';
     el.dataset.pos=`p${f.page} x:${f.x} y:${f.y}`;
+    if(dragDebug.enabled)dragDebugShow(`이동 중 · ${ev.pointerType} #${pid} · move ${dragDebug.active?.moves||0}\np${f.page} x:${f.x} y:${f.y} · Δ ${Math.round(dx)},${Math.round(dy)}`);
     // 모바일에서는 pointermove 중 renderFieldList/syncJson가 매우 무겁다.
     // 이동 중에는 DOM 위치만 갱신하고, 목록/JSON/편집 패널은 pointerup에서 한 번만 동기화한다.
   }
 
   function onUp(ev){
     if(!active||ev.pointerId!==pid)return;
+    const endKind=ev.type==='pointercancel'?'브라우저 취소(pointercancel)':'정상 종료(pointerup)';
     suppressOverlayClick(500);
     const inpEl2=el.querySelector('.note-input');
     if(inpEl2)inpEl2.style.pointerEvents=''; // 차단 해제
@@ -1645,6 +1808,8 @@ function installNoteDrag(el,bar,body,f){
     } else if(f.type==='sign'){
       // 서명 노트 단순 클릭 → 선택만 (모달은 활성화 후 더블클릭으로)
     }
+    dragDebugShow(`${endKind} · 드래그 ${dragging?'진행':'미시작'} · move ${dragDebug.active?.moves||0}\np${f.page} x:${f.x} y:${f.y}`,true);
+    dragDebug.active=null;
     try{el.releasePointerCapture?.(pid)}catch(e){}
     document.body.classList.remove('note-dragging');
     active=false; dragging=false; pid=-1;
@@ -1662,6 +1827,7 @@ function installNoteDrag(el,bar,body,f){
 function installResize(handle,f,el,mode){
   let sx,sy,ow,os,dragging=false;
   handle.addEventListener('pointerdown',ev=>{
+    dragDebugShow(`시작 · 크기 조절점(${mode}) · ${ev.pointerType} #${ev.pointerId}\np${f.page} x:${f.x} y:${f.y}`,true);
     suppressOverlayClick(500);
     snapshot(); // 리사이즈 시작 전 Undo 스냅샷
     dragging=true;sx=ev.clientX;sy=ev.clientY;
@@ -1671,6 +1837,7 @@ function installResize(handle,f,el,mode){
   });
   handle.addEventListener('pointermove',ev=>{
     if(!dragging)return;
+    dragDebugShow(`크기 조절 중(${mode}) · Δ ${Math.round(ev.clientX-sx)},${Math.round(ev.clientY-sy)}`);
     if(mode==='width'){
       f.w=Math.max(30,Math.round(ow+ev.clientX-sx));
       el.style.width=f.w+'px';
@@ -1686,9 +1853,14 @@ function installResize(handle,f,el,mode){
   });
   handle.addEventListener('pointerup',()=>{
     dragging=false;
+    dragDebugShow(`정상 종료(pointerup) · 크기 조절점(${mode})`,true);
     // 드래그 끝나면 목록·편집패널 동기화
     renderFieldList();renderEditPanel()
-  })
+  });
+  handle.addEventListener('pointercancel',()=>{
+    dragging=false;
+    dragDebugShow(`브라우저 취소(pointercancel) · 크기 조절점(${mode})`,true);
+  });
 }
 
 // ── 빠른 값 입력 (탭1) ──
@@ -2451,7 +2623,10 @@ $('signInsertBtn').onclick=()=>{
 };
 
 // ── 고급 모달 ──
-document.querySelector('.topbar-logo').addEventListener('dblclick',()=>$('advModal').classList.remove('hidden'));
+document.querySelector('.topbar-logo').addEventListener('dblclick',()=>{
+  // 기존 PC 더블클릭 고급 설정은 유지. 터치 더블탭은 진단 패널 5회 탭을 가로채지 않는다.
+  if(lastTitlePointerType!=='touch')$('advModal').classList.remove('hidden');
+});
 $('closeAdvModal').onclick=()=>$('advModal').classList.add('hidden');
 $('advModal').addEventListener('click',ev=>{if(ev.target===$('advModal'))$('advModal').classList.add('hidden')});
 
@@ -2960,7 +3135,7 @@ async function renderImagePageToCanvasForJpg(p){
 async function renderDisplayCanvasWithFields(p,kx=1,ky=1){
   const src=p.canvas;
   const out=document.createElement('canvas');
-  out.width=Math.round(src.width*kx); out.height=Math.round(src.height*ky);
+  out.width=Math.round(p.viewW*kx); out.height=Math.round(p.viewH*ky);
   const ctx=out.getContext('2d',{alpha:false});
   ctx.fillStyle='#ffffff';
   ctx.fillRect(0,0,out.width,out.height);
