@@ -30,13 +30,18 @@ body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(-
 /* ── 상단바 ── */
 .topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;background:var(--white);border-bottom:1px solid var(--border);flex-shrink:0;z-index:40}
 .topbar-logo{font-weight:700;font-size:15px;letter-spacing:-.3px;color:var(--accent);white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}
-.drag-debug-panel{position:fixed;right:12px;bottom:12px;z-index:10000;width:min(390px,calc(100vw - 24px));max-height:min(50vh,360px);display:flex;flex-direction:column;gap:6px;padding:10px;background:rgba(15,23,42,.96);color:#fff;border-radius:9px;box-shadow:0 5px 25px #0005;font:11px/1.4 monospace;overflow:hidden}
+.drag-debug-panel{position:fixed;right:12px;bottom:12px;z-index:2147483646;width:min(460px,calc(100vw - 24px));max-height:min(72dvh,560px);display:flex;flex-direction:column;gap:6px;padding:10px;background:rgba(15,23,42,.96);color:#fff;border-radius:9px;box-shadow:0 5px 25px #0005;font:11px/1.4 monospace;overflow:hidden}
 .drag-debug-panel[hidden]{display:none!important}
 .drag-debug-header{display:flex;align-items:center;gap:6px;font:700 12px/1.4 sans-serif}
 .drag-debug-header strong{flex:1}
 .drag-debug-header button{padding:3px 7px;border:1px solid #64748b;border-radius:4px;background:#334155;color:#fff;font:inherit}
 .drag-debug-status{white-space:pre-wrap;word-break:break-word}
 .drag-debug-log{min-height:50px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#cbd5e1;border-top:1px solid #475569;padding-top:5px;user-select:text;-webkit-user-select:text}
+.drag-debug-actions{display:flex;gap:5px;flex-wrap:wrap}
+.drag-debug-actions button{padding:4px 7px;border:1px solid #64748b;border-radius:4px;background:#334155;color:#fff;font:11px sans-serif}
+.drag-debug-command{display:flex;gap:5px;min-height:55px}
+.drag-debug-command textarea{flex:1;min-width:0;resize:vertical;border:1px solid #64748b;border-radius:4px;background:#0f172a;color:#fff;padding:5px;font:12px/1.4 monospace}
+.drag-debug-command button{border:1px solid #64748b;border-radius:4px;background:#2563eb;color:#fff;padding:0 9px}
 .topbar-sep{width:1px;height:24px;background:var(--border);flex-shrink:0}
 .topbar-right{display:flex;gap:8px;align-items:center;margin-left:auto}
 .upload-btn{position:relative;overflow:hidden;cursor:pointer}
@@ -652,9 +657,11 @@ body.preview-mode .overlay .note.empty:hover{
 
 <!-- 좌표 디버그 옵션 (숨김, 우클릭 메뉴로 접근 가능) -->
 <div id="dragDebugPanel" class="drag-debug-panel" hidden aria-label="드래그 진단 패널">
-  <div class="drag-debug-header"><strong>드래그 진단</strong><button type="button" id="dragDebugCopy">복사</button><button type="button" id="dragDebugClose">닫기</button></div>
+  <div class="drag-debug-header"><strong>DBG · 서식 입력기</strong><button type="button" id="dragDebugCopy">복사</button><button type="button" id="dragDebugClear">지우기</button><button type="button" id="dragDebugClose">닫기</button></div>
   <div id="dragDebugStatus" class="drag-debug-status">입력창을 터치해 상태를 확인하세요.</div>
+  <div class="drag-debug-actions"><button type="button" id="dragDebugCheck">기본 진단</button><button type="button" id="dragDebugJpg">JPG 렌더 시험</button><button type="button" id="dragDebugGesture">드래그 실측</button></div>
   <div id="dragDebugLog" class="drag-debug-log"></div>
+  <div class="drag-debug-command"><textarea id="dragDebugCode" spellcheck="false" placeholder="JS 입력: formDebug.summary() 또는 1+1"></textarea><button type="button" id="dragDebugRun">Run</button></div>
 </div>
 <div id="advModal" class="modal-bg hidden">
   <div class="modal">
@@ -1663,7 +1670,7 @@ function buildNote(f){
 // 필드 수만큼 이벤트 호출이 쌓여 모바일에서 심각한 성능 저하가 발생한다.
 // 전역 Map에 핸들러를 등록하고 document 레벨에서는 단 1회만 바인딩한다.
 const _noteDragHandlers = new Map(); // el → {onMove, onUp}
-const dragDebug={enabled:false,taps:0,lastTap:0,lines:[],active:null};
+const dragDebug={enabled:false,taps:0,lastTap:0,lines:[],active:null,gesture:null};
 let lastTitlePointerType='mouse';
 $('debugTitle').addEventListener('pointerdown',ev=>{lastTitlePointerType=ev.pointerType});
 function dragDebugTarget(target){
@@ -1681,12 +1688,109 @@ function dragDebugShow(message,record=false){
   }
   $('dragDebugStatus').textContent=message;
 }
+const dragDebugConsole={};
+function dragDebugCaptureConsole(enable){
+  for(const level of ['log','warn','error']){
+    if(enable&&!dragDebugConsole[level]){
+      const original=console[level];dragDebugConsole[level]=original;
+      console[level]=(...args)=>{
+        original.apply(console,args);
+        dragDebugPrint(`console.${level}`,args.map(x=>x instanceof Error?String(x.stack||x):x));
+      };
+    }else if(!enable&&dragDebugConsole[level]){
+      console[level]=dragDebugConsole[level];delete dragDebugConsole[level];
+    }
+  }
+}
 function dragDebugToggle(){
   dragDebug.enabled=!dragDebug.enabled;
   $('dragDebugPanel').hidden=!dragDebug.enabled;
   dragDebug.active=null;
+  dragDebugCaptureConsole(dragDebug.enabled);
   if(dragDebug.enabled)dragDebugShow('대기 중 · 입력창을 터치해 상태를 확인하세요.',true);
 }
+function dragDebugPrint(label,value){
+  let formatted;
+  try{formatted=typeof value==='string'?value:JSON.stringify(value,null,2)}catch(e){formatted=String(value)}
+  dragDebugShow(`${label}: ${formatted===undefined?'undefined':formatted}`,true);
+}
+// Run용 공개 API: 화면을 바꾸지 않고 현재 렌더·좌표·내보내기 경로를 점검한다.
+window.formDebug={
+  summary:()=>({kind:state.kind,file:state.fileName,pages:state.pages.length,fields:state.fields.length,
+    selected:state.selectedId,dpr:window.devicePixelRatio,requestedK:REQUESTED_DISPLAY_K,
+    lowResolutionLocked:!!state.lowResolutionLocked}),
+  rendering:()=>{
+    if(!state.pages.length)return {result:'SKIP',reason:'파일을 먼저 열어주세요'};
+    const pages=state.pages.map(p=>{
+      const r=p.canvas.getBoundingClientRect(),ratioX=p.canvas.width/p.viewW,ratioY=p.canvas.height/p.viewH;
+      const ok=p.canvas.width>0&&p.canvas.height>0&&Math.abs(r.width-p.viewW)<1.1&&Math.abs(r.height-p.viewH)<1.1&&Math.abs(ratioX-ratioY)<0.02;
+      return {page:p.page,result:ok?'PASS':'FAIL',css:[p.viewW,p.viewH],dom:[Math.round(r.width),Math.round(r.height)],bitmap:[p.canvas.width,p.canvas.height],appliedK:p.displayK};
+    });
+    return {result:pages.every(p=>p.result==='PASS')?'PASS':'FAIL',pages};
+  },
+  coordinates:()=>{
+    if(!state.pages.length)return {result:'SKIP',reason:'파일을 먼저 열어주세요'};
+    if(!state.fields.length)return {result:'SKIP',reason:'텍스트 필드를 추가해 주세요'};
+    const fields=state.fields.map(f=>{
+      const p=state.pages[f.page-1],el=p?.overlay.querySelector(`.note[data-id="${CSS.escape(f.id)}"]`);
+      if(!p||!el)return {id:f.id,result:'FAIL',reason:'필드 DOM 없음'};
+      const x=parseFloat(el.style.left),y=parseFloat(el.style.top);
+      const delta=Math.max(Math.abs(x-f.x),Math.abs(y-f.y));
+      return {id:f.id,page:f.page,result:delta<0.1?'PASS':'FAIL',field:[f.x,f.y],dom:[x,y],delta};
+    });
+    return {result:fields.every(f=>f.result==='PASS')?'PASS':'FAIL',fields};
+  },
+  async jpg(){
+    if(!state.pages.length)return {result:'SKIP',reason:'파일을 먼저 열어주세요'};
+    const p=state.pages.find(x=>x.page===selected()?.page)||state.pages[0];
+    let out;
+    try{
+      out=await renderPageToCanvas(p);
+      const ok=out.width>0&&out.height>0;
+      return {result:ok?'PASS':'FAIL',page:p.page,output:[out.width,out.height],display:[p.viewW,p.viewH]};
+    }catch(e){return {result:'FAIL',page:p.page,error:String(e?.message||e)}}
+    finally{if(out&&out!==p.canvas)releaseCanvas(out)}
+  }
+};
+$('dragDebugCheck').addEventListener('click',()=>{
+  dragDebugPrint('상태',formDebug.summary());
+  dragDebugPrint('표시 렌더',formDebug.rendering());
+  dragDebugPrint('필드 좌표',formDebug.coordinates());
+});
+$('dragDebugJpg').addEventListener('click',async()=>{
+  dragDebugShow('JPG 렌더 시험 진행 중...',true);
+  dragDebugPrint('JPG 렌더 시험',await formDebug.jpg());
+});
+$('dragDebugGesture').addEventListener('click',()=>{
+  dragDebug.gesture={start:null,completed:false};
+  dragDebugShow('드래그 실측 대기 · 입력창 상단 손잡이를 잡고 20px 이상 이동한 뒤 놓으세요.',true);
+});
+$('dragDebugClear').addEventListener('click',()=>{
+  dragDebug.lines=[];$('dragDebugLog').textContent='';
+  dragDebugShow('로그 지움 · 기능 시험을 실행하세요.');
+});
+// HWPX DBG와 같이 입력 코드를 실행한다. 인라인 script이므로 eval/new Function은 사용하지 않는다.
+// 전역 var는 다음 Run에도 유지되며, 모듈 내부 상태는 window.formDebug로 읽는다.
+window.__formDbgEmit=value=>dragDebugPrint('Run 결과',value);
+window.__formDbgError=error=>dragDebugPrint('Run 오류',String(error?.stack||error));
+function runDragDebugCode(){
+  const code=$('dragDebugCode').value.trim();if(!code)return;
+  dragDebugPrint('Run',code);
+  const expression=!/^(?:var|let|const|function|class|if|for|while|try|throw|return|import|export|\{|\/\/)/.test(code)&&!/[;\n]/.test(code);
+  const body=expression?`window.__formDbgEmit((${code}))`:`${code}\nwindow.__formDbgEmit('완료')`;
+  const script=document.createElement('script');
+  script.textContent=`try { ${body}\n } catch (__formDbgException) { window.__formDbgError(__formDbgException) }`;
+  const onSyntaxError=ev=>{
+    if(ev.filename===location.href||!ev.filename)window.__formDbgError(ev.message);
+  };
+  window.addEventListener('error',onSyntaxError);
+  document.head.appendChild(script);script.remove();
+  window.removeEventListener('error',onSyntaxError);
+}
+$('dragDebugRun').addEventListener('click',runDragDebugCode);
+$('dragDebugCode').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();runDragDebugCode()}
+});
 // 제목에서 발생한 click만 센다. 다른 버튼이나 이동 중 탭은 누적하지 않는다.
 $('debugTitle').addEventListener('click',ev=>{
   if(ev.detail===0)return;
@@ -1695,7 +1799,7 @@ $('debugTitle').addEventListener('click',ev=>{
   dragDebug.lastTap=now;
   if(dragDebug.taps>=5){dragDebug.taps=0;dragDebugToggle()}
 });
-$('dragDebugClose').addEventListener('click',()=>{dragDebug.enabled=false;dragDebug.active=null;$('dragDebugPanel').hidden=true});
+$('dragDebugClose').addEventListener('click',()=>{dragDebug.enabled=false;dragDebug.active=null;$('dragDebugPanel').hidden=true;dragDebugCaptureConsole(false)});
 $('dragDebugCopy').addEventListener('click',async()=>{
   const report=['드래그 진단',`상태: ${$('dragDebugStatus').textContent}`,...dragDebug.lines].join('\n');
   try{await navigator.clipboard.writeText(report);$('dragDebugCopy').textContent='복사됨'}
@@ -1737,6 +1841,7 @@ function installNoteDrag(el,bar,body,f){
     if(dragDebug.enabled){
       dragDebug.active={id:f.id,pointerId:ev.pointerId,moves:0,startX:ev.clientX,startY:ev.clientY,target:dragDebugTarget(ev.target)};
       dragDebugShow(`시작 · ${dragDebug.active.target} · ${ev.pointerType} #${ev.pointerId}\np${f.page} x:${f.x} y:${f.y}`,true);
+      if(dragDebug.gesture&&!dragDebug.gesture.completed)dragDebug.gesture.start={id:f.id,pointerId:ev.pointerId,target:dragDebugTarget(ev.target),x:f.x,y:f.y};
     }
     selectField(f.id, true); // skipStampRebuild=true
     if(onInp && !state.previewMode){
@@ -1809,6 +1914,13 @@ function installNoteDrag(el,bar,body,f){
       // 서명 노트 단순 클릭 → 선택만 (모달은 활성화 후 더블클릭으로)
     }
     dragDebugShow(`${endKind} · 드래그 ${dragging?'진행':'미시작'} · move ${dragDebug.active?.moves||0}\np${f.page} x:${f.x} y:${f.y}`,true);
+    if(dragDebug.enabled&&dragDebug.gesture?.start?.pointerId===pid){
+      const start=dragDebug.gesture.start,dist=Math.hypot(f.x-start.x,f.y-start.y);
+      const outcome=ev.type==='pointercancel'?'FAIL':dragging&&dist>=20?'PASS':'FAIL';
+      dragDebugPrint('드래그 실측',{result:outcome,target:start.target,end:endKind,
+        moves:dragDebug.active?.moves||0,before:[start.x,start.y],after:[f.x,f.y],distance:Math.round(dist)});
+      dragDebug.gesture.completed=true;
+    }
     dragDebug.active=null;
     try{el.releasePointerCapture?.(pid)}catch(e){}
     document.body.classList.remove('note-dragging');
