@@ -126,6 +126,9 @@ body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(-
 
 /* ── 뷰어 ── */
 .viewer-area{flex:1;overflow-y:auto;overflow-x:hidden;background:var(--bg);padding:24px;position:relative}
+.add-mode-banner{position:sticky;top:0;height:0;z-index:35;pointer-events:none}
+.add-mode-banner-inner{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #93c5fd;border-radius:7px;background:#eff6ff;box-shadow:var(--shadow-md);font-size:12px;font-weight:700;color:#1e40af;pointer-events:auto}
+.add-mode-banner button{flex:0 0 auto;border:1px solid #93c5fd;border-radius:5px;background:#fff;color:#1e40af;padding:5px 8px;cursor:pointer}
 /* page-wrap 상단에 note-bar(18px) 공간 확보 — bar가 위로 튀어나와 스크롤 유발 방지 */
 .page-wrap{position:relative;margin:0 auto 24px;margin-top:20px;background:var(--white);box-shadow:var(--shadow-md);width:max-content;border-radius:2px}
 .page-label{position:absolute;left:0;top:-26px;font-size:11px;color:var(--text-muted);background:var(--white);padding:2px 8px;border-radius:4px;border:1px solid var(--border)}
@@ -793,6 +796,7 @@ async function ensurePdfJs(){
 
 const $=id=>document.getElementById(id);
 const state={kind:null,fileName:'',bytes:null,pdf:null,imageBlob:null,pages:[],fields:[],selectedId:null,scale:1.35,suppressOverlayClickUntil:0,addMode:null,previewMode:false};
+let pendingSign=null;
 
 // ── Undo/Redo 히스토리 ──────────────────────────────────────────────────
 const _history={undo:[],redo:[]};
@@ -843,7 +847,7 @@ function redoAction(){
 function uid(){return'f_'+Math.random().toString(36).slice(2,9)}
 function normalizeField(f){
   return{id:f.id||uid(),key:f.key||'',label:f.label||'필드',type:f.type||'text',
-    page:Number(f.page||1),x:Number(f.x||40),y:Number(f.y||40),
+    page:Number(f.page||1),x:Number(f.x??40),y:Number(f.y??40),
     w:f.w==null?0:Number(f.w),h:f.h==null?0:Number(f.h),
     size:Number(f.size||13),scaleX:Number(f.scaleX||100),
     color:f.color||'#111111',value:f.value||'',
@@ -995,6 +999,7 @@ async function loadFile(file){
   if(!file)return;
   const isValid=file.type==='application/pdf'||file.type.startsWith('image/');
   if(!isValid)return alert('PDF 또는 이미지 파일(PNG, JPG)만 지원합니다.');
+  clearAddMode();
   const keepFields=state.fields.length>0&&confirm('기존 입력값/필드를 유지할까요?\n(취소하면 초기화됩니다)');
   const savedFields=keepFields?[...state.fields]:[];
 
@@ -1421,22 +1426,42 @@ function setupTextPlaceholder(inp,f){
 
 function updateAddModeUi(){
   document.body.classList.toggle('add-mode',!!state.addMode);
-  const textBtn=$('addTextBtn'), checkBtn=$('addCheckBtn');
+  const textBtn=$('addTextBtn'), checkBtn=$('addCheckBtn'), signBtn=$('addSignBtn');
   if(textBtn)textBtn.classList.toggle('mode-active',state.addMode==='text');
   if(checkBtn)checkBtn.classList.toggle('mode-active',state.addMode==='check');
+  if(signBtn)signBtn.classList.toggle('mode-active',state.addMode==='sign');
+  const viewer=$('viewer');
+  let banner=$('addModeBanner');
+  if(state.addMode&&viewer){
+    if(!banner){
+      banner=document.createElement('div');banner.id='addModeBanner';banner.className='add-mode-banner';
+      banner.innerHTML='<div class="add-mode-banner-inner"><span id="addModeBannerText"></span><button type="button" id="addModeCancel">취소</button></div>';
+      banner.querySelector('button').onclick=clearAddMode;
+      viewer.prepend(banner);
+    }
+    $('addModeBannerText').textContent=`${{text:'텍스트',check:'체크',sign:'서명'}[state.addMode]} 넣을 위치(빈 곳)를 탭하세요`;
+  }else if(banner)banner.remove();
   state.pages.forEach(p=>{
-    if(p.overlay)p.overlay.title=state.addMode?((state.addMode==='check'?'체크':'텍스트')+' 추가 위치를 클릭하세요'):'추가 버튼을 먼저 누른 뒤 위치를 클릭하세요';
+    if(p.overlay)p.overlay.title=state.addMode?(`${{text:'텍스트',check:'체크',sign:'서명'}[state.addMode]} 추가 위치의 빈 곳을 클릭하세요`):'추가 버튼을 먼저 누른 뒤 위치를 클릭하세요';
   });
 }
 function setAddMode(mode){
   if(!state.pages.length){alert('파일을 먼저 열어주세요.');return;}
   state.addMode=state.addMode===mode?null:mode;
+  if(state.addMode!=='sign')pendingSign=null;
   updateAddModeUi();
-  log(state.addMode?(state.addMode==='check'?'체크':'텍스트')+' 추가 모드 — PDF에서 위치를 클릭하세요':'추가 모드 해제');
+  log(state.addMode?`${{text:'텍스트',check:'체크',sign:'서명'}[state.addMode]} 추가 모드 — PDF 빈 곳을 클릭하세요`:'추가 모드 해제');
 }
 function clearAddMode(){
-  if(!state.addMode)return;
+  if(!state.addMode&&!pendingSign)return;
+  pendingSign=null;
   state.addMode=null;updateAddModeUi();log('추가 모드 해제');
+}
+function getDefaultSignSize(pageNo){
+  const p=getPageMeta(pageNo);
+  const scale=p?.scale||BASE_RENDER_SCALE;
+  const baseScale=state.kind==='image'&&p?.imgW?Math.min(1,1000/p.imgW):BASE_RENDER_SCALE;
+  return {w:Math.round(160*scale/baseScale),h:Math.round(70*scale/baseScale)};
 }
 function duplicateSelectedField(){
   const f=selected();if(!f)return;
@@ -1532,7 +1557,14 @@ function installOverlayClick(overlay,pageNo){
     const clickX=Math.round(ev.clientX-r.left);
     const clickY=Math.round(ev.clientY-r.top);
     let f;
-    if(state.addMode==='check'){
+    if(state.addMode==='sign'){
+      if(!pendingSign)return;
+      const img=pendingSign;
+      const p=getPageMeta(pageNo),{w,h}=getDefaultSignSize(pageNo);
+      const x=Math.max(0,Math.min(Math.round(clickX-w/2),p.viewW-w));
+      const y=Math.max(0,Math.min(Math.round(clickY-h/2),p.viewH-h));
+      f=normalizeField({type:'sign',label:'서명',value:'sign',imgData:img,page:pageNo,x,y,w,h,size:13});
+    }else if(state.addMode==='check'){
       f=normalizeField({type:'check',label:'체크',value:'✓',page:pageNo,x:Math.max(0,clickX-8),y:Math.max(0,clickY-getTextAnchorOffsetY()),size:getDefaultFieldSize('check',pageNo),w:24});
     }else{
       const x=Math.max(0,clickX-TEXT_NOTE_ANCHOR_OFFSET_X);
@@ -1540,9 +1572,9 @@ function installOverlayClick(overlay,pageNo){
       f=normalizeField({type:'text',label:'텍스트',value:'',page:pageNo,x,y,size:getDefaultFieldSize('text',pageNo),w:120});
     }
     snapshot();state.fields.push(f);state.selectedId=f.id;
-    state.addMode=null;
-    renderAll(false);updateAddModeUi();
-    log(`새 ${f.type==='check'?'체크':'텍스트'} 추가 → ${pageNo}쪽 기준 x:${clickX} y:${clickY}`);
+    clearAddMode();
+    renderAll(false);
+    log(`새 ${{check:'체크',text:'텍스트',sign:'서명'}[f.type]} 추가 → ${pageNo}쪽 기준 x:${clickX} y:${clickY}`);
   })
 }
 
@@ -2584,6 +2616,7 @@ $('addTextBtn').onclick=()=>setAddMode('text');
 $('addCheckBtn').onclick=()=>setAddMode('check');
 $('addSignBtn').onclick=()=>{
   if(!state.pages.length)return alert('파일을 먼저 열어주세요.');
+  if(state.addMode==='sign'){clearAddMode();return;}
   openSignModal(null);
 };
 $('copySignBtn').onclick=()=>copySignField(null);
@@ -2822,30 +2855,17 @@ $('signInsertBtn').onclick=()=>{
     dataUrl=_signImgDataUrl;
   }
 
-  snapshot(); // 서명 추가/수정 전 상태 저장
   if(_signTarget){
     // 기존 서명 업데이트
+    snapshot();
     _signTarget.imgData=dataUrl;
     renderAll(false);
+    log('서명 이미지 변경 완료');
   } else {
-    // 새 서명 필드 추가
-    // 오래 전에 선택한 필드의 쪽보다 현재 화면에 보이는 쪽을 우선한다.
-    const pageNo=getDefaultInsertPosition(0,0,true).page;
-    const p=getPageMeta(pageNo);
-    const scale=p?.scale||BASE_RENDER_SCALE;
-    const baseScale=state.kind==='image'&&p?.imgW?Math.min(1,1000/p.imgW):BASE_RENDER_SCALE;
-    const w=Math.round(160*scale/baseScale),h=Math.round(70*scale/baseScale);
-    const pos=getDefaultInsertPosition(w,h,true);
-    pos.x=Math.min(Math.max(0,(p?.viewW||w)-w),pos.x);
-    pos.y=Math.min(Math.max(0,(p?.viewH||h)-h),pos.y);
-    const f=normalizeField({type:'sign',label:'서명',value:'sign',imgData:dataUrl,
-      page:pos.page,x:pos.x,y:pos.y,w,h,size:13});
-    state.fields.push(f);state.selectedId=f.id;
-    renderAll(false);
-    document.querySelector('[data-tab="fields"]').click();
+    pendingSign=dataUrl;
+    setAddMode('sign');
   }
   closeSignModal();
-  log('서명 추가 완료 — 드래그로 위치 조정하세요');
 };
 
 // ── 고급 모달 ──
