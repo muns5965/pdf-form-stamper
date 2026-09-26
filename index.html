@@ -1467,6 +1467,20 @@ function deleteSelectedField(){
   const f=selected();if(!f)return;
   snapshot();state.fields=state.fields.filter(x=>x.id!==f.id);state.selectedId=null;renderAll(false);log('선택 필드 삭제');
 }
+function confirmCompactDelete(button,label,ev){
+  const pointerType=button._deletePointerType;
+  button._deletePointerType=null;
+  if((pointerType==='touch'||(!pointerType&&ev.detail===0))&&
+     !confirm(`「${label||'필드'}」 입력창을 삭제할까요?`))return false;
+  return true;
+}
+function trackCompactDeletePointer(button,onDown){
+  button.addEventListener('pointerdown',ev=>{
+    button._deletePointerType=ev.pointerType;
+    if(onDown)onDown(ev);
+  });
+  button.addEventListener('pointercancel',()=>{button._deletePointerType=null});
+}
 function setPreviewMode(on){
   state.previewMode=!!on;
   document.body.classList.toggle('preview-mode',state.previewMode);
@@ -1569,9 +1583,9 @@ function buildNote(f){
   const bar=document.createElement('div');bar.className='note-bar';
   const barLabel=document.createElement('span');barLabel.className='note-bar-label';barLabel.textContent=f.label;
   const delBtn=document.createElement('button');delBtn.className='note-del';delBtn.textContent='✕';delBtn.title='입력창 삭제';delBtn.setAttribute('aria-label','입력창 삭제');
-  delBtn.onpointerdown=ev=>{suppressOverlayClick(500);ev.stopPropagation()};
+  trackCompactDeletePointer(delBtn,ev=>{suppressOverlayClick(500);ev.stopPropagation()});
   delBtn.onclick=ev=>{suppressOverlayClick(500);ev.stopPropagation();
-    if(window.matchMedia('(pointer: coarse)').matches&&!confirm(`「${f.label||'입력창'}」을 삭제할까요?`))return;
+    if(!confirmCompactDelete(delBtn,f.label,ev))return;
     snapshot();
     if(state.selectedId===f.id)state.selectedId=null;
     state.fields=state.fields.filter(x=>x.id!==f.id);renderAll(false)};
@@ -2404,8 +2418,10 @@ function renderFieldList(){
     const delBtn=document.createElement('button');
     delBtn.className='btn sm danger';delBtn.style.cssText='padding:2px 7px;font-size:11px;margin-left:4px;flex-shrink:0';
     delBtn.textContent='✕';delBtn.title='이 필드 삭제';
+    trackCompactDeletePointer(delBtn);
     delBtn.onclick=ev=>{
       ev.stopPropagation();
+      if(!confirmCompactDelete(delBtn,f.label,ev))return;
       snapshot();
       if(state.selectedId===f.id)state.selectedId=null;
       state.fields=state.fields.filter(x=>x.id!==f.id);
@@ -2813,9 +2829,16 @@ $('signInsertBtn').onclick=()=>{
     renderAll(false);
   } else {
     // 새 서명 필드 추가
-    const pos=getDefaultInsertPosition(160,70);
+    const pageNo=getDefaultInsertPosition(0,0).page;
+    const p=getPageMeta(pageNo);
+    const scale=p?.scale||BASE_RENDER_SCALE;
+    const baseScale=state.kind==='image'&&p?.imgW?Math.min(1,1000/p.imgW):BASE_RENDER_SCALE;
+    const w=Math.round(160*scale/baseScale),h=Math.round(70*scale/baseScale);
+    const pos=getDefaultInsertPosition(w,h);
+    pos.x=Math.min(Math.max(0,(p?.viewW||w)-w),pos.x);
+    pos.y=Math.min(Math.max(0,(p?.viewH||h)-h),pos.y);
     const f=normalizeField({type:'sign',label:'서명',value:'sign',imgData:dataUrl,
-      page:pos.page,x:pos.x,y:pos.y,w:160,h:70,size:13});
+      page:pos.page,x:pos.x,y:pos.y,w,h,size:13});
     state.fields.push(f);state.selectedId=f.id;
     renderAll(false);
     document.querySelector('[data-tab="fields"]').click();
