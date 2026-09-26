@@ -1258,11 +1258,11 @@ function updateJpgPageButtons(){
   });
 }
 
-function getDefaultInsertPosition(w=160,h=70){
+function getDefaultInsertPosition(w=160,h=70,preferVisible=false){
   const viewer=$('viewer');
   const vr=viewer.getBoundingClientRect();
   const selectedField=selected();
-  if(selectedField&&state.pages[selectedField.page-1]){
+  if(!preferVisible&&selectedField&&state.pages[selectedField.page-1]){
     return{page:selectedField.page,x:Math.max(0,selectedField.x+20),y:Math.max(0,selectedField.y+20)};
   }
   let best=null,bestArea=-1;
@@ -2829,12 +2829,13 @@ $('signInsertBtn').onclick=()=>{
     renderAll(false);
   } else {
     // 새 서명 필드 추가
-    const pageNo=getDefaultInsertPosition(0,0).page;
+    // 오래 전에 선택한 필드의 쪽보다 현재 화면에 보이는 쪽을 우선한다.
+    const pageNo=getDefaultInsertPosition(0,0,true).page;
     const p=getPageMeta(pageNo);
     const scale=p?.scale||BASE_RENDER_SCALE;
     const baseScale=state.kind==='image'&&p?.imgW?Math.min(1,1000/p.imgW):BASE_RENDER_SCALE;
     const w=Math.round(160*scale/baseScale),h=Math.round(70*scale/baseScale);
-    const pos=getDefaultInsertPosition(w,h);
+    const pos=getDefaultInsertPosition(w,h,true);
     pos.x=Math.min(Math.max(0,(p?.viewW||w)-w),pos.x);
     pos.y=Math.min(Math.max(0,(p?.viewH||h)-h),pos.y);
     const f=normalizeField({type:'sign',label:'서명',value:'sign',imgData:dataUrl,
