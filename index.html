@@ -1568,9 +1568,10 @@ function buildNote(f){
   // 핸들바 (드래그용)
   const bar=document.createElement('div');bar.className='note-bar';
   const barLabel=document.createElement('span');barLabel.className='note-bar-label';barLabel.textContent=f.label;
-  const delBtn=document.createElement('button');delBtn.className='note-del';delBtn.textContent='✕';delBtn.title='삭제';
+  const delBtn=document.createElement('button');delBtn.className='note-del';delBtn.textContent='✕';delBtn.title='입력창 삭제';delBtn.setAttribute('aria-label','입력창 삭제');
   delBtn.onpointerdown=ev=>{suppressOverlayClick(500);ev.stopPropagation()};
   delBtn.onclick=ev=>{suppressOverlayClick(500);ev.stopPropagation();
+    if(window.matchMedia('(pointer: coarse)').matches&&!confirm(`「${f.label||'입력창'}」을 삭제할까요?`))return;
     snapshot();
     if(state.selectedId===f.id)state.selectedId=null;
     state.fields=state.fields.filter(x=>x.id!==f.id);renderAll(false)};
