@@ -3102,11 +3102,21 @@ function downloadBlob(blob,name){
 }
 function baseName(){return(state.fileName||'output').replace(/\.[^.]+$/,'')}
 
+let pdfFontBytesPromise=null;
+function getPdfFontBytes(){
+  if(!pdfFontBytesPromise){
+    const url='https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf';
+    pdfFontBytesPromise=fetch(url).then(r=>{
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.arrayBuffer();
+    }).catch(err=>{pdfFontBytesPromise=null;throw err});
+  }
+  return pdfFontBytesPromise;
+}
 async function getPdfFont(pdfDoc){
   try{
     if(window.fontkit)pdfDoc.registerFontkit(window.fontkit);
-    const url='https://cdn.jsdelivr.net/gh/googlefonts/noto-cjk@main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf';
-    const fontBytes=await fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()});
+    const fontBytes=await getPdfFontBytes();
     return await pdfDoc.embedFont(fontBytes,{subset:true})
   }catch(e){
     // 한글 폰트 로드 실패 — 사용자에게 명시적으로 알리고 계속 여부 확인
