@@ -850,7 +850,7 @@ function normalizeField(f){
     page:Number(f.page||1),x:Number(f.x??40),y:Number(f.y??40),
     w:f.w==null?0:Number(f.w),h:f.h==null?0:Number(f.h),
     size:Number(f.size||13),scaleX:Number(f.scaleX||100),
-    color:f.color||'#111111',value:f.value||'',
+    color:typeof f.color==='string'&&/^#[0-9a-fA-F]{6}$/.test(f.color)?f.color:'#111111',value:f.value||'',
     imgData:f.imgData||'',  // base64 — sign 타입 전용
     autoW:f.autoW===false?false:true,  // text 타입 자동 폭 계산. 리사이즈하면 false
     group:f.group||'',groupKey:f.groupKey||'',groupVal:f.groupVal||''}
@@ -2950,8 +2950,8 @@ $('jsonFileInput').addEventListener('change',async e=>{
   const file=e.target.files[0];if(!file)return;
   try{
     const text=await file.text();_pending=JSON.parse(text);
-    const fields=_pending.fields||[];const withVal=fields.some(x=>x.value);
-    $('jsonPreviewText').innerHTML='<b>'+file.name+'</b><br>필드 '+fields.length+'개 · 저장일: '+(_pending.savedAt||'?')+'<br>원본: '+(_pending.fileName||'?')+'<br><span style="color:'+(withVal?'var(--success)':'var(--text-muted)')+'">'+(withVal?'✅ 입력값 포함':'📐 위치만')+'</span>';
+    const fields=Array.isArray(_pending.fields)?_pending.fields:[];const withVal=fields.some(x=>x.value);
+    $('jsonPreviewText').innerHTML='<b>'+esc(file.name)+'</b><br>필드 '+fields.length+'개 · 저장일: '+esc(_pending.savedAt||'?')+'<br>원본: '+esc(_pending.fileName||'?')+'<br><span style="color:'+(withVal?'var(--success)':'var(--text-muted)')+'">'+(withVal?'✅ 입력값 포함':'📐 위치만')+'</span>';
     $('jsonLoadPreview').style.display='';
     $('loadAllBtn').disabled=!withVal;
   }catch(ex){alert('읽기 실패: '+ex.message);_pending=null}
