@@ -644,8 +644,15 @@ body.preview-mode .overlay .note.empty:hover{
             📂 JSON 파일 선택
             <input id="jsonFileInput" type="file" accept=".json,application/json">
           </div>
-          <div id="jsonLoadPreview" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12px;margin-top:6px">
-            <div id="jsonPreviewText" style="color:var(--text-muted);margin-bottom:8px"></div>
+        <div id="jsonLoadPreview" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12px;margin-top:6px">
+          <div id="jsonPreviewText" style="color:var(--text-muted);margin-bottom:8px"></div>
+          <div id="legacyCoordRow" style="display:none;margin-bottom:8px;font-size:12px">
+            <label for="legacyCoordMode">이전 JSON의 좌표 기준</label>
+            <select id="legacyCoordMode" class="btn sm" style="margin-left:5px">
+              <option value="keep">기존 좌표 그대로</option>
+              <option value="pc">PC 화면 기준으로 환산</option>
+            </select>
+          </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="btn sm accent" id="loadLayoutOnlyBtn">📐 위치만 적용</button>
               <button class="btn sm" id="loadAllBtn">📝 위치+값 적용</button>
@@ -911,6 +918,15 @@ function getPageMeta(pageNo){
 function getPageScale(pageNo){
   const meta=getPageMeta(pageNo);
   return Number(meta?.scale || state.scale || BASE_RENDER_SCALE);
+}
+function getMinFieldSize(pageNo){
+  const p=getPageMeta(pageNo);
+  if(state.kind==='image'&&p?.imgW&&p?.imgH){
+    const pcRatio=Math.min(1,1000/p.imgW);
+    const pcViewH=Math.round(p.imgH*pcRatio);
+    return 6*p.viewH/pcViewH;
+  }
+  return 6*getPageScale(pageNo)/BASE_RENDER_SCALE;
 }
 function getDefaultFieldSize(type='text',pageNo=1){
   // f.size는 화면 canvas 픽셀 기준이다.
@@ -2521,11 +2537,11 @@ function renderEditPanel(){
       <div class="edit-section-title">위치 / 크기</div>
       <div class="form-row"><label>페이지</label><input id="ePage" type="number" min="1" value="${f.page}"></div>
       <div class="coord-grid">
-        <div class="form-row"><label>X</label><input id="eX" type="number" value="${f.x}"></div>
-        <div class="form-row"><label>Y</label><input id="eY" type="number" value="${f.y}"></div>
+      <div class="form-row"><label>X</label><input id="eX" type="number" step="any" value="${f.x}"></div>
+      <div class="form-row"><label>Y</label><input id="eY" type="number" step="any" value="${f.y}"></div>
       </div>
-      <div class="form-row"><label>글자크기</label><input id="eSize" type="number" min="6" value="${f.size}"></div>
-      <div class="form-row"><label>폭</label><input id="eW" type="number" min="0" value="${f.w||0}">
+      <div class="form-row"><label>글자크기</label><input id="eSize" type="number" min="${getMinFieldSize(f.page).toFixed(2)}" step="any" value="${f.size}"></div>
+      <div class="form-row"><label>폭</label><input id="eW" type="number" min="0" step="any" value="${f.w||0}">
         ${f.type==='text'?`<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-muted);margin-left:6px;cursor:pointer;white-space:nowrap"><input id="eAutoW" type="checkbox" ${f.autoW!==false?'checked':''} style="margin:0"> 자동폭</label>`:''}
       </div>
       <div class="form-row"><label>가로배율</label><input id="eScaleX" type="number" min="30" max="200" value="${f.scaleX}"></div>
@@ -2544,6 +2560,7 @@ function renderEditPanel(){
     const f2=selected();if(!f2)return;
     f2.label=$('eLabel').value;f2.value=$('eValue').value;
     f2.type=$('eType').value;f2.page=Number($('ePage').value);
+    $('eSize').min=getMinFieldSize(f2.page).toFixed(2);
     f2.x=Number($('eX').value);f2.y=Number($('eY').value);
     f2.size=Number($('eSize').value);
     f2.scaleX=Number($('eScaleX').value);
@@ -2934,22 +2951,60 @@ function syncJson(){
 }
 $('loadJsonBtn')?.addEventListener('click',()=>applyJson($('jsonBox').value));
 
+function roundJsonCoord(n){return Math.round(Number(n)*100)/100}
+function jsonFieldFactors(pageNo){
+  const p=getPageMeta(pageNo);
+  if(state.kind==='image'&&p?.imgW&&p?.imgH){
+    return{x:p.imgW/p.viewW,y:p.imgH/p.viewH};
+  }
+  const scale=p?.scale||state.scale||BASE_RENDER_SCALE;
+  return{x:1/scale,y:1/scale};
+}
+function convertJsonField(field,toDocument){
+  const {x,y}=jsonFieldFactors(field.page);
+  const fx=toDocument?x:1/x,fy=toDocument?y:1/y;
+  return{...field,
+    x:roundJsonCoord(field.x*fx),y:roundJsonCoord(field.y*fy),
+    w:field.w?roundJsonCoord(field.w*fx):0,
+    h:field.h?roundJsonCoord(field.h*fy):0,
+    size:roundJsonCoord(field.size*fy)};
+}
+function convertLegacyPcField(field){
+  const p=getPageMeta(field.page);
+  let fx,fy;
+  if(state.kind==='image'&&p?.imgW&&p?.imgH){
+    const pcRatio=Math.min(1,1000/p.imgW);
+    fx=p.viewW/Math.round(p.imgW*pcRatio);
+    fy=p.viewH/Math.round(p.imgH*pcRatio);
+  }else{
+    fx=(p?.scale||state.scale||BASE_RENDER_SCALE)/BASE_RENDER_SCALE;
+    fy=fx;
+  }
+  return{...field,x:roundJsonCoord(field.x*fx),y:roundJsonCoord(field.y*fy),
+    w:field.w?roundJsonCoord(field.w*fx):0,
+    h:field.h?roundJsonCoord(field.h*fy):0,
+    size:roundJsonCoord(field.size*fy)};
+}
 function makeJsonObj(withValues=true){
-  return{version:20,savedAt:new Date().toLocaleString('ko-KR'),
+  return{version:21,coordUnit:state.kind==='image'?'image-px':'pdfjs-scale1',savedAt:new Date().toLocaleString('ko-KR'),
     fileName:state.fileName||'',
     // baseline: JSON 호환용 필드 — canvasToPdf() 좌표 계산에 현재 미사용
     baseline:Number($('baseline')?.value||0.85),
     fields:state.fields.map(f=>{
       const{id,...rest}=f;
-      if(!withValues)return{...rest,value:'',imgData:''};
-      return rest;
+      const converted=convertJsonField(rest,true);
+      if(!withValues)return{...converted,value:'',imgData:''};
+      return converted;
     })
   }
 }
-function applyJson(jsonStr,withValues=true,askMerge=false){
+function applyJson(jsonStr,withValues=true,askMerge=false,legacyMode='keep'){
   let obj;
   try{obj=JSON.parse(jsonStr)}catch(e){alert('JSON 파싱 실패: '+e.message);return}
   if(!obj.fields||!Array.isArray(obj.fields)){alert('필드 데이터가 없습니다.');return}
+  if(obj.version>=21&&!state.pages.length){alert('JSON 좌표를 적용할 파일을 먼저 열어주세요.');return}
+  const expectedUnit=state.kind==='image'?'image-px':'pdfjs-scale1';
+  if(obj.version>=21&&obj.coordUnit!==expectedUnit){alert('JSON 좌표 단위가 현재 서식 종류와 다릅니다.');return}
   if(askMerge&&state.fields.length>0){
     const choice=confirm('현재 필드 '+state.fields.length+'개가 있습니다.\n\n[확인] 전체 덮어쓰기\n[취소] 기존 위치 유지 + 값만 채우기');
     if(!choice){
@@ -2962,7 +3017,11 @@ function applyJson(jsonStr,withValues=true,askMerge=false){
     }
   }
   snapshot();
-  state.fields=obj.fields.map(f=>normalizeField(withValues?f:{...f,value:''}));
+  state.fields=obj.fields.map(raw=>{
+    const f=withValues?raw:{...raw,value:''};
+    const converted=obj.version>=21?convertJsonField(f,false):legacyMode==='pc'?convertLegacyPcField(f):f;
+    return normalizeField(converted);
+  });
   if(obj.baseline&&$('baseline'))$('baseline').value=obj.baseline;
   state.selectedId=null;renderAll(false);
   log('불러오기 완료 — 필드 '+state.fields.length+'개 ('+(withValues?'위치+값':'위치만')+')')
@@ -2993,13 +3052,15 @@ $('jsonFileInput').addEventListener('change',async e=>{
     const text=await file.text();_pending=JSON.parse(text);
     const fields=Array.isArray(_pending.fields)?_pending.fields:[];const withVal=fields.some(x=>x.value);
     $('jsonPreviewText').innerHTML='<b>'+esc(file.name)+'</b><br>필드 '+fields.length+'개 · 저장일: '+esc(_pending.savedAt||'?')+'<br>원본: '+esc(_pending.fileName||'?')+'<br><span style="color:'+(withVal?'var(--success)':'var(--text-muted)')+'">'+(withVal?'✅ 입력값 포함':'📐 위치만')+'</span>';
+    $('legacyCoordRow').style.display=_pending.version>=21?'none':'';
+    $('legacyCoordMode').value='keep';
     $('jsonLoadPreview').style.display='';
     $('loadAllBtn').disabled=!withVal;
   }catch(ex){alert('읽기 실패: '+ex.message);_pending=null}
   e.target.value='';
 });
-$('loadLayoutOnlyBtn').onclick=()=>{if(!_pending)return;applyJson(JSON.stringify(_pending),false,state.fields.length>0);hidePreview()};
-$('loadAllBtn').onclick=()=>{if(!_pending)return;applyJson(JSON.stringify(_pending),true,state.fields.length>0);hidePreview()};
+$('loadLayoutOnlyBtn').onclick=()=>{if(!_pending)return;applyJson(JSON.stringify(_pending),false,state.fields.length>0,$('legacyCoordMode').value);hidePreview()};
+$('loadAllBtn').onclick=()=>{if(!_pending)return;applyJson(JSON.stringify(_pending),true,state.fields.length>0,$('legacyCoordMode').value);hidePreview()};
 $('cancelLoadBtn').onclick=()=>hidePreview();
 function hidePreview(){$('jsonLoadPreview').style.display='none';_pending=null}
 
