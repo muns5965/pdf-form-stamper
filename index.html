@@ -31,7 +31,22 @@ body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(-
 .topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;background:var(--white);border-bottom:1px solid var(--border);flex-shrink:0;z-index:40}
 .topbar-logo{font-weight:700;font-size:15px;letter-spacing:-.3px;color:var(--accent);white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .settings-button{order:3;flex:0 0 auto;background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
-.topbar-scroll-wrap{display:contents}
+.topbar-row-break{display:none}
+.topbar-scroll-wrap{position:relative;flex:1 1 0;min-width:0}
+.topbar-right{width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:thin}
+.topbar-scroll-arrow{position:absolute;top:2px;bottom:2px;z-index:2;width:27px;border:0;border-radius:5px;background:rgba(37,99,235,.9);color:white;font-size:20px;cursor:pointer}
+.topbar-scroll-arrow.left{left:0}.topbar-scroll-arrow.right{right:0}
+.topbar-scroll-wrap.can-left .topbar-scroll-arrow.left,.topbar-scroll-wrap.can-right .topbar-scroll-arrow.right{display:block}
+.topbar-scroll-wrap.can-left .topbar-right{mask-image:linear-gradient(to right,transparent,#000 30px);-webkit-mask-image:linear-gradient(to right,transparent,#000 30px)}
+.topbar-scroll-wrap.can-right .topbar-right{mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent);-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent)}
+.topbar-scroll-wrap.can-left.can-right .topbar-right{mask-image:linear-gradient(to right,transparent,#000 30px,#000 calc(100% - 30px),transparent);-webkit-mask-image:linear-gradient(to right,transparent,#000 30px,#000 calc(100% - 30px),transparent)}
+.save-dock{order:2;flex:0 0 auto;position:relative}
+.save-actions{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.save-menu-button{display:none}
+.save-dock.compact .save-menu-button{display:inline-flex}
+.save-dock.compact .save-actions{flex-direction:column;align-items:stretch}
+.save-menu{position:absolute;right:0;top:calc(100% + 5px);z-index:60;padding:8px;border:1px solid var(--border);border-radius:8px;background:#fff;box-shadow:var(--shadow-md)}
+.save-menu[hidden]{display:none!important}
 .topbar-scroll-arrow{display:none}
 .drag-debug-panel{position:fixed;right:12px;top:60px;z-index:2147483646;width:min(460px,calc(100vw - 24px));height:min(26dvh,220px);display:flex;flex-direction:column;gap:6px;padding:10px;background:rgba(15,23,42,.96);color:#fff;border-radius:9px;box-shadow:0 5px 25px #0005;font:11px/1.4 monospace;overflow:hidden}
 .drag-debug-panel[hidden]{display:none!important}
@@ -61,7 +76,7 @@ body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(-
 .btn.danger:hover{background:#fef2f2}
 .btn.sm{padding:4px 10px;font-size:12px}
 .btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
-.file-label{font-size:13px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-label{font-size:13px;color:var(--text-muted);flex:0 0 120px;min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ── 메인 레이아웃 ── */
 .layout{display:flex;flex:1;overflow:hidden}
@@ -69,7 +84,7 @@ body{font-family:'Nanum Gothic','Malgun Gothic',system-ui,sans-serif;color:var(-
 /* ── 사이드바 ── */
 .sidebar{width:var(--sidebar);flex-shrink:0;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
-.tab{flex:1;padding:10px 4px;text-align:center;font-size:13px;font-weight:700;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s}
+.tab{flex:1;min-width:0;padding:10px 2px;text-align:center;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-panel{display:none;flex:1;overflow-y:auto;padding:14px}
@@ -348,7 +363,7 @@ body.focus-selected-mode .focus-mode-hint{display:inline-flex}
   .topbar{
     width:100%;max-width:100vw;height:auto;min-height:52px;
     flex-wrap:wrap;align-content:flex-start;align-items:flex-start;
-    gap:6px;padding:8px;overflow:hidden
+    column-gap:6px;row-gap:0;padding:8px;overflow:visible
   }
   .topbar-logo{min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1}
   .topbar-logo .logo-text{display:none}
@@ -356,7 +371,9 @@ body.focus-selected-mode .focus-mode-hint{display:inline-flex}
   .topbar>.upload-btn{flex:0 0 auto}
   .file-label{flex:1 1 0;min-width:0;max-width:none;font-size:12px;line-height:31px}
   .topbar .settings-button{order:0;flex:0 0 36px;width:36px;height:36px;padding:0;justify-content:center;font-size:20px}
-  .topbar-scroll-wrap{order:1;position:relative;display:block;flex:0 0 100%;min-width:0}
+  .topbar-row-break{display:block;order:0;flex:0 0 100%;height:0}
+  .topbar-scroll-wrap{order:1;flex:1 1 0;min-width:0}
+  .save-dock{order:1}
   .topbar-right{
     width:100%;max-width:100%;margin-left:0;display:flex;
     flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;
@@ -365,11 +382,11 @@ body.focus-selected-mode .focus-mode-hint{display:inline-flex}
   .topbar-scroll-wrap.can-left .topbar-right{-webkit-mask-image:linear-gradient(to right,transparent 0,#000 30px);mask-image:linear-gradient(to right,transparent 0,#000 30px)}
   .topbar-scroll-wrap.can-right .topbar-right{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 30px),transparent)}
   .topbar-scroll-wrap.can-left.can-right .topbar-right{-webkit-mask-image:linear-gradient(to right,transparent 0,#000 30px,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(to right,transparent 0,#000 30px,#000 calc(100% - 30px),transparent)}
-  .topbar-scroll-arrow{position:absolute;top:4px;bottom:6px;z-index:2;width:27px;border:0;border-radius:5px;background:rgba(37,99,235,.9);color:white;font-size:20px;line-height:1;cursor:pointer}
+  .topbar-scroll-arrow{top:4px;bottom:6px;line-height:1}
   .topbar-scroll-arrow.left{left:0}
   .topbar-scroll-arrow.right{right:0}
   .topbar-scroll-wrap.can-left .topbar-scroll-arrow.left,.topbar-scroll-wrap.can-right .topbar-scroll-arrow.right{display:block}
-  .topbar .btn,.topbar select,.jpg-page-buttons,.jpg-page-buttons .btn{flex:0 0 auto}
+  .topbar .btn,.topbar select{flex:0 0 auto}
   .jpg-page-buttons{max-width:none;flex-wrap:nowrap;overflow:visible}
   .layout{flex:1;min-height:0;width:100%;max-width:100%;flex-direction:column;overflow:hidden}
   .sidebar{
@@ -531,6 +548,7 @@ body.preview-mode .overlay .note.empty:hover{
   </div>
   <span id="fileName" class="file-label">파일을 열어주세요</span>
   <button type="button" id="settingsBtn" class="btn sm settings-button" title="설정" aria-label="설정">⚙️</button>
+  <div class="topbar-row-break" aria-hidden="true"></div>
   <div class="topbar-scroll-wrap" id="topbarScrollWrap">
     <button type="button" class="topbar-scroll-arrow left" id="topbarScrollLeft" aria-label="앞쪽 버튼 보기">‹</button>
     <div class="topbar-right" id="topbarScroll">
@@ -543,15 +561,19 @@ body.preview-mode .overlay .note.empty:hover{
     <button id="previewModeBtn" class="btn sm" title="포스트잇 배경·테두리를 숨겨 저장 결과에 가깝게 확인">👁 미리보기</button>
     <button id="clearValuesBtn" class="btn sm" title="입력값만 지우기 (필드 위치는 유지)">✕ 값 초기화</button>
     <button id="clearAllBtn" class="btn sm danger" title="필드 전체 삭제">🗑 전체삭제</button>
-    <div class="topbar-sep"></div>
-    <button id="exportPdfBtn" class="btn accent">⬇ PDF 저장</button>
-    <select id="exportImgPageSelect" class="btn sm" title="JPG로 저장할 페이지 선택" style="display:none;height:31px;min-width:92px;padding:4px 8px">
-      <option value="all">JPG 전체</option>
-    </select>
-    <div id="jpgPageButtons" class="jpg-page-buttons" title="JPG 저장 대상"></div>
-    <button id="exportImgBtn" class="btn accent" style="background:#0891b2;border-color:#0891b2">⬇ JPG 저장</button>
     </div>
     <button type="button" class="topbar-scroll-arrow right" id="topbarScrollRight" aria-label="뒤쪽 버튼 보기">›</button>
+  </div>
+  <div class="save-dock" id="saveDock">
+    <button type="button" id="saveMenuButton" class="btn sm save-menu-button" aria-expanded="false" aria-controls="saveMenu">⬇ 저장</button>
+    <div id="saveActions" class="save-actions">
+      <button id="exportPdfBtn" class="btn accent">⬇ PDF 저장</button>
+      <select id="exportImgPageSelect" class="btn sm" title="JPG로 저장할 페이지 선택" style="height:31px;min-width:92px;padding:4px 8px">
+        <option value="all">JPG 전체</option>
+      </select>
+      <button id="exportImgBtn" class="btn accent" style="background:#0891b2;border-color:#0891b2">⬇ JPG 저장</button>
+    </div>
+    <div id="saveMenu" class="save-menu" hidden></div>
   </div>
 </div>
 
@@ -1223,7 +1245,6 @@ function updateJpgPageSelect(){
     opt.value=String(p.page);opt.textContent=p.page+'쪽만';sel.appendChild(opt);
   });
   sel.value=[...sel.options].some(o=>o.value===prev)?prev:'visible';
-  updateJpgPageButtons();
 }
 
 function getMostVisiblePage(){
@@ -1239,28 +1260,6 @@ function getMostVisiblePage(){
     if(area>bestArea){bestArea=area;best=p;}
   });
   return best||state.pages[0]||null;
-}
-
-function updateJpgPageButtons(){
-  const box=$('jpgPageButtons');
-  const sel=$('exportImgPageSelect');
-  if(!box||!sel)return;
-  const mode=sel.value||'visible';
-  box.innerHTML='';
-  const items=[
-    ['visible','현재쪽'],
-    ['selected','선택쪽'],
-    ...state.pages.map(p=>[String(p.page),p.page+'쪽']),
-    ['all','전체ZIP']
-  ];
-  items.forEach(([val,label])=>{
-    const b=document.createElement('button');
-    b.type='button';
-    b.className='btn sm'+(mode===val?' active':'');
-    b.textContent=label;
-    b.onclick=()=>{sel.value=val;updateJpgPageButtons();log('JPG 저장 대상: '+label)};
-    box.appendChild(b);
-  });
 }
 
 function getDefaultInsertPosition(w=160,h=70,preferVisible=false){
@@ -1584,7 +1583,7 @@ function renderAll(skipQuickRebuild=false){
   document.body.classList.toggle('debug',$('debugToggle').checked);
   renderStamps();
   if(skipQuickRebuild) syncQuickValues(); else buildQuickValues();
-  renderFieldList();renderEditPanel();syncJson();updateSelectedMiniBar();updateAddModeUi();updateJpgPageButtons()
+  renderFieldList();renderEditPanel();syncJson();updateSelectedMiniBar();updateAddModeUi()
 }
 
 // ── 포스트잇 노트 렌더 ──
@@ -1734,19 +1733,58 @@ function buildNote(f){
 // 전역 Map에 핸들러를 등록하고 document 레벨에서는 단 1회만 바인딩한다.
 const _noteDragHandlers = new Map(); // el → {onMove, onUp}
 const dragDebug={enabled:false,minimized:false,moved:false,taps:0,lastTap:0,lines:[],active:null,gesture:null};
+let fullSaveWidth=0;
+function closeSaveMenu(){
+  $('saveMenu').hidden=true;
+  $('saveMenuButton').setAttribute('aria-expanded','false');
+}
+function measureFullSaveWidth(){
+  const actions=$('saveActions'),dock=$('saveDock'),menu=$('saveMenu');
+  const inMenu=actions.parentNode===menu;
+  if(inMenu){actions.style.visibility='hidden';dock.classList.remove('compact');dock.appendChild(actions)}
+  fullSaveWidth=actions.getBoundingClientRect().width;
+  if(inMenu){menu.appendChild(actions);dock.classList.add('compact');actions.style.visibility=''}
+}
+function updateSaveLayout(){
+  if(document.activeElement===$('exportImgPageSelect'))return;
+  if(!fullSaveWidth)measureFullSaveWidth();
+  const dock=$('saveDock'),actions=$('saveActions'),menu=$('saveMenu');
+  // 두 모드 모두 스크롤 영역과 저장 영역의 폭 합계가 같다.
+  const available=$('topbarScrollWrap').clientWidth+dock.getBoundingClientRect().width;
+  const compact=available<fullSaveWidth+240;
+  if(compact!==dock.classList.contains('compact')){
+    closeSaveMenu();
+    dock.classList.toggle('compact',compact);
+    (compact?menu:dock).appendChild(actions);
+  }
+  requestAnimationFrame(updateTopbarOverflow);
+}
 function updateTopbarOverflow(){
   const strip=$('topbarScroll'),wrap=$('topbarScrollWrap');
   const max=Math.max(0,strip.scrollWidth-strip.clientWidth);
   wrap.classList.toggle('can-left',max>2&&strip.scrollLeft>2);
   wrap.classList.toggle('can-right',max>2&&strip.scrollLeft<max-2);
 }
+$('saveMenuButton').addEventListener('click',()=>{
+  const menu=$('saveMenu');menu.hidden=!menu.hidden;
+  $('saveMenuButton').setAttribute('aria-expanded',String(!menu.hidden));
+});
+document.addEventListener('pointerdown',ev=>{
+  if(!$('saveMenu').hidden&&!$('saveDock').contains(ev.target))closeSaveMenu();
+});
+for(const id of ['exportPdfBtn','exportImgBtn'])$(id).addEventListener('click',closeSaveMenu);
+$('exportImgPageSelect').addEventListener('blur',()=>{measureFullSaveWidth();updateSaveLayout()});
 $('topbarScroll').addEventListener('scroll',updateTopbarOverflow,{passive:true});
 $('topbarScrollLeft').addEventListener('click',()=>$('topbarScroll').scrollBy({left:-$('topbarScroll').clientWidth*0.8,behavior:'smooth'}));
 $('topbarScrollRight').addEventListener('click',()=>$('topbarScroll').scrollBy({left:$('topbarScroll').clientWidth*0.8,behavior:'smooth'}));
-window.addEventListener('resize',updateTopbarOverflow);
+window.addEventListener('resize',()=>{updateSaveLayout();updateTopbarOverflow()});
 if(window.ResizeObserver)new ResizeObserver(updateTopbarOverflow).observe($('topbarScroll'));
 new MutationObserver(()=>requestAnimationFrame(updateTopbarOverflow)).observe($('topbarScroll'),{subtree:true,childList:true,attributes:true});
-requestAnimationFrame(updateTopbarOverflow);
+requestAnimationFrame(()=>{measureFullSaveWidth();updateSaveLayout()});
+document.fonts.ready.then(()=>{
+  if(document.activeElement===$('exportImgPageSelect'))return;
+  measureFullSaveWidth();updateSaveLayout();
+});
 let lastTitlePointerType='mouse';
 $('debugTitle').addEventListener('pointerdown',ev=>{lastTitlePointerType=ev.pointerType});
 function dragDebugTarget(target){
@@ -2548,7 +2586,7 @@ function selectField(id, skipStampRebuild=false){
   document.querySelectorAll('.note').forEach(n=>{
     n.classList.toggle('active', n.dataset.id===id)
   });
-  syncQuickValues();renderFieldList();renderEditPanel();syncJson();updateSelectedMiniBar();updateJpgPageButtons();updateFocusModeBySelection();
+  syncQuickValues();renderFieldList();renderEditPanel();syncJson();updateSelectedMiniBar();updateFocusModeBySelection();
   const f=selected();if(f&&changed)scrollToField(f);
   // 값 입력 탭이 활성일 때만 사이드바 quick-row도 스크롤 동기화
   if(changed&&getActiveTabName()==='input'){
@@ -2567,7 +2605,10 @@ window.addEventListener('beforeunload', ev=>{
 });
 
 document.addEventListener('keydown',ev=>{
-  if(ev.key==='Escape'){clearAddMode();return;}
+  if(ev.key==='Escape'){
+    if(!$('saveMenu').hidden){closeSaveMenu();return}
+    clearAddMode();return;
+  }
   // Ctrl+Z: 실행취소, Ctrl+Y / Ctrl+Shift+Z: 다시실행
   if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key==='z'){
     if(document.activeElement.contentEditable==='true')return; // 텍스트 편집 중엔 브라우저 기본 동작
