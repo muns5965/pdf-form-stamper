@@ -205,6 +205,9 @@ canvas.page-canvas{display:block}
 /* text-shadow: 흰 halo — 포스트잇 배경이 반투명이어도 텍스트가 선명하게 보임 */
 .note-input{all:unset;flex:1;font-family:inherit;line-height:1.2;word-break:break-all;white-space:pre-wrap;cursor:text;min-width:20px;user-select:text;pointer-events:all;-webkit-user-select:text;
   text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 2px #fff}
+.note.detected-small .note-body{padding:0;min-height:0;justify-content:center}
+.note.detected-small .note-input{min-width:0;text-align:center}
+.note.detected-small .note-bar{min-width:38px}
 .debug .note::after{content:attr(data-pos);position:absolute;left:0;top:-18px;font-size:9px;color:var(--danger);background:#fff;border:1px solid #fca5a5;border-radius:3px;padding:0 3px;white-space:nowrap;pointer-events:none}
 
 /* 서명 노트 — 비활성은 텍스트와 동일한 노란 계열 테두리, 활성만 초록 */
@@ -552,8 +555,7 @@ body.preview-mode .overlay .note.empty:hover{
   <div class="topbar-scroll-wrap" id="topbarScrollWrap">
     <button type="button" class="topbar-scroll-arrow left" id="topbarScrollLeft" aria-label="앞쪽 버튼 보기">‹</button>
     <div class="topbar-right" id="topbarScroll">
-    <button id="findFormBoxesBtn" class="btn sm" title="보이는 쪽의 입력칸 후보를 표시합니다. 필드는 만들지 않습니다.">🔎 입력칸 표시</button>
-    <button id="clearFormBoxesBtn" class="btn sm" title="입력칸 후보 표시를 지웁니다.">후보 지우기</button>
+    <button id="findFormBoxesBtn" class="btn sm" title="보이는 쪽의 입력칸을 찾아 편집 가능한 필드를 만듭니다.">🔎 입력칸 자동생성</button>
     <button id="undoBtn" class="btn sm" title="실행 취소 (Ctrl+Z)" disabled>↩ 취소</button>
     <button id="redoBtn" class="btn sm" title="다시 실행 (Ctrl+Y)" disabled>↪ 복원</button>
     <button id="addTextBtn" class="btn sm">＋ 텍스트</button>
@@ -1692,12 +1694,12 @@ function buildNote(f){
   const isActive=f.id===state.selectedId;
 
   const el=document.createElement('div');
-  el.className='note'+(f.type==='check'?' check':'')+(f.type==='sign'?' sign':'')+(has?'':' empty')+(isActive?' active':'');
+  el.className='note'+(f.type==='check'?' check':'')+(f.type==='sign'?' sign':'')+(f.group==='detected-small'?' detected-small':'')+(has?'':' empty')+(isActive?' active':'');
   el.dataset.id=f.id;
   el.dataset.pos=`p${f.page} x:${f.x} y:${f.y}`;
   const h=f.h>0?f.h:80;
   if(shouldAutoFitText(f)) f.w=getAutoTextWidth(f);
-  el.style.cssText=`left:${f.x}px;top:${f.y}px;font-size:${f.size}px;color:${f.color||'#111'};width:${f.w>0?f.w+'px':'120px'};min-width:${f.type==='check'?'24px':'60px'};${f.type==='sign'?`height:${h}px`:''}`
+  el.style.cssText=`left:${f.x}px;top:${f.y}px;font-size:${f.size}px;color:${f.color||'#111'};width:${f.w>0?f.w+'px':'120px'};min-width:${f.group==='detected-small'?'0px':f.type==='check'?'24px':'60px'};${f.group==='detected-small'?`min-height:0;height:${Math.max(10,h)}px;`:''}${f.type==='sign'?`height:${h}px`:''}`
 
   // 핸들바 (드래그용)
   const bar=document.createElement('div');bar.className='note-bar';
@@ -2419,6 +2421,35 @@ $('dragDebugDetect').addEventListener('click',async ev=>{
 });
 $('dragDebugDetectClear').addEventListener('click',()=>{formDetectClear();dragDebugShow('후보 표시를 지웠습니다.',true)});
 let formDetectUiBusy=false;
+function createDetectedFields(cands){
+  const added=[];
+  for(const c of cands){
+    const p=getPageMeta(c.page);if(!p)continue;
+    const kx=state.kind==='image'&&p.imgW?p.viewW/p.imgW:p.scale;
+    const ky=state.kind==='image'&&p.imgH?p.viewH/p.imgH:p.scale;
+    const x=c.x*kx,y=c.y*ky,w=c.w*kx,h=c.h*ky;
+    if(![x,y,w,h].every(Number.isFinite)||w<4||h<4)continue;
+    const small=c.kind==='digit'||c.kind==='check';
+    const type=c.kind==='check'?'check':'text';
+    // 작은 숫자칸은 각각 한 글자 필드로 만든다. 기존 필드와 같은 위치는 건너뛴다.
+    const key=`detected:${c.page}:${c.kind}:${Math.round(c.x*2)}:${Math.round(c.y*2)}`;
+    if([...state.fields,...added].some(f=>f.key===key&&f.page===c.page))continue;
+    if(state.fields.some(f=>f.page===c.page&&f.type!=='sign'&&
+       x+w/2>=f.x&&x+w/2<=f.x+Math.max(10,f.w)&&
+       y+h/2>=f.y&&y+h/2<=f.y+Math.max(12,f.h||f.size*1.3)))continue;
+    const size=Math.max(6,Math.min(getDefaultFieldSize(type,c.page),
+      Math.floor((h-(small?1:4))/1.25),small?Math.floor(w*0.85):100));
+    const field=normalizeField({key,label:c.label||({check:'체크',digit:'숫자칸'}[c.kind]||'입력칸'),
+      type,page:c.page,group:small?'detected-small':'',
+      x:Math.round((x+(small?0:2))*10)/10,
+      y:Math.round((y+(h-size*1.2)/2-(small?1:3))*10)/10,
+      w:Math.max(small?6:24,Math.round(w-(small?0:5))),
+      h:small?Math.max(10,Math.round(h)):0,size,autoW:false,value:''});
+    added.push(field);
+  }
+  if(added.length){snapshot();state.fields.push(...added);state.selectedId=null;renderAll(false)}
+  return added.length;
+}
 $('findFormBoxesBtn').addEventListener('click',async ev=>{
   if(formDetectUiBusy||formDetectBusy||ev.timeStamp<formDetectDoneAt)return;
   const btn=$('findFormBoxesBtn');formDetectUiBusy=true;btn.disabled=true;
@@ -2429,12 +2460,13 @@ $('findFormBoxesBtn').addEventListener('click',async ev=>{
     if(result.result==='SKIP')return alert(result.reason);
     if(result.result!=='DONE')return;
     const count=result.cands.length;
-    log(`${result.page}쪽 입력칸 후보 ${count}개 표시 (필드 생성 없음)`);
-    if(!count)alert(`${result.page}쪽에서 입력칸 후보를 찾지 못했습니다. 필드는 직접 배치해 주세요.`);
+    const added=createDetectedFields(result.cands);
+    formDetectClear();
+    log(`${result.page}쪽 입력칸 ${added}개 자동생성${count&&!added?' (이미 배치된 칸은 건너뜀)':''} · 잘못된 필드는 옮기거나 삭제하세요.`);
+    if(!count)alert(`${result.page}쪽에서 입력칸을 찾지 못했습니다. 필드는 직접 배치해 주세요.`);
   }catch(e){log('입력칸 찾기 실패');alert('입력칸 찾기 실패: '+(e?.message||e))}
   finally{btn.textContent=label;btn.disabled=false;formDetectUiBusy=false}
 });
-$('clearFormBoxesBtn').addEventListener('click',()=>{formDetectClear();log('입력칸 후보 표시를 지웠습니다.')});
 $('dragDebugCheck').addEventListener('click',()=>{
   dragDebugPrint('상태',formDebug.summary());
   dragDebugPrint('표시 렌더',formDebug.rendering());
