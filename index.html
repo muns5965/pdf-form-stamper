@@ -552,6 +552,8 @@ body.preview-mode .overlay .note.empty:hover{
   <div class="topbar-scroll-wrap" id="topbarScrollWrap">
     <button type="button" class="topbar-scroll-arrow left" id="topbarScrollLeft" aria-label="앞쪽 버튼 보기">‹</button>
     <div class="topbar-right" id="topbarScroll">
+    <button id="findFormBoxesBtn" class="btn sm" title="보이는 쪽의 입력칸 후보를 표시합니다. 필드는 만들지 않습니다.">🔎 입력칸 표시</button>
+    <button id="clearFormBoxesBtn" class="btn sm" title="입력칸 후보 표시를 지웁니다.">후보 지우기</button>
     <button id="undoBtn" class="btn sm" title="실행 취소 (Ctrl+Z)" disabled>↩ 취소</button>
     <button id="redoBtn" class="btn sm" title="다시 실행 (Ctrl+Y)" disabled>↪ 복원</button>
     <button id="addTextBtn" class="btn sm">＋ 텍스트</button>
@@ -739,8 +741,9 @@ body.preview-mode .overlay .note.empty:hover{
       <button class="btn sm" id="applyOffsetBtn">적용</button>
     </div>
     <div class="divider"></div>
-    <button class="btn sm" id="detectBtn">PDF 자동감지</button>
     <details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px">개발자</summary>
+      <div style="font-size:12px;margin-top:8px;color:var(--text-muted)">기존 라벨 자동배치는 일부 서식에서 위치가 맞지 않을 수 있으며 기존 필드를 교체합니다.</div>
+      <button class="btn sm" id="detectBtn" style="margin-top:6px">기존 라벨 자동배치 (시험)</button>
       <div class="form-row" style="margin-top:10px"><label>필드 좌표</label><input id="debugToggle" type="checkbox"><span style="font-size:12px">표시</span></div>
       <textarea id="jsonBox" style="width:100%;height:100px;border:1px solid var(--border);border-radius:6px;padding:6px;font:12px/1.4 monospace;resize:vertical" placeholder="좌표 JSON"></textarea>
       <button class="btn sm" id="loadJsonBtn" style="margin-top:6px">JSON 적용</button>
@@ -2415,6 +2418,23 @@ $('dragDebugDetect').addEventListener('click',async ev=>{
   catch(e){dragDebugPrint('입력칸 찾기 오류',String(e?.stack||e))}
 });
 $('dragDebugDetectClear').addEventListener('click',()=>{formDetectClear();dragDebugShow('후보 표시를 지웠습니다.',true)});
+let formDetectUiBusy=false;
+$('findFormBoxesBtn').addEventListener('click',async ev=>{
+  if(formDetectUiBusy||formDetectBusy||ev.timeStamp<formDetectDoneAt)return;
+  const btn=$('findFormBoxesBtn');formDetectUiBusy=true;btn.disabled=true;
+  const label=btn.textContent;btn.textContent='입력칸 찾는 중…';log('보이는 쪽의 입력칸을 찾는 중...');
+  try{
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    const result=await formDebug.detect();
+    if(result.result==='SKIP')return alert(result.reason);
+    if(result.result!=='DONE')return;
+    const count=result.cands.length;
+    log(`${result.page}쪽 입력칸 후보 ${count}개 표시 (필드 생성 없음)`);
+    if(!count)alert(`${result.page}쪽에서 입력칸 후보를 찾지 못했습니다. 필드는 직접 배치해 주세요.`);
+  }catch(e){log('입력칸 찾기 실패');alert('입력칸 찾기 실패: '+(e?.message||e))}
+  finally{btn.textContent=label;btn.disabled=false;formDetectUiBusy=false}
+});
+$('clearFormBoxesBtn').addEventListener('click',()=>{formDetectClear();log('입력칸 후보 표시를 지웠습니다.')});
 $('dragDebugCheck').addEventListener('click',()=>{
   dragDebugPrint('상태',formDebug.summary());
   dragDebugPrint('표시 렌더',formDebug.rendering());
