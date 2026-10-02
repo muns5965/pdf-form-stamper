@@ -809,12 +809,60 @@ body.preview-mode .overlay .note.empty:hover{
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script type="module">
 let pdfjsLib=null;
+// ── 면적 0 채우기 보정 v3 (pdf.js 4.x: ctx 경로 / 5.x·6.x: Path2D 경로 모두 대응) ──
+// 일부 PDF는 표 선을 '두께 0인 직선 도형을 채우기(f)'로 그린다. PDF 규격·크롬은 1픽셀 선으로 그리지만
+// canvas는 면적 0이면 아무것도 칠하지 않는다. 면적이 정확히 0인 직선 하위경로만 골라 1장치픽셀 선을 더 그린다.
+// Path2D는 만들어질 때의 좌표를 기록만 해 두고(그리기 동작은 그대로), 실제 판정·보정은 pdfCtx로 감싼 canvas에서만 한다.
+const ZF_PATHS=new WeakMap();
+(()=>{const P=Path2D.prototype;if(P.__zf)return;P.__zf=true;const o={};
+  const rec=(p)=>{let r=ZF_PATHS.get(p);if(!r){r={subs:[],cur:null};ZF_PATHS.set(p,r)}return r};
+  for(const k of ['moveTo','lineTo','rect','bezierCurveTo','quadraticCurveTo','arc','arcTo','ellipse','roundRect','addPath'])if(P[k])o[k]=P[k];
+  P.moveTo=function(x,y){const r=rec(this);r.cur={pts:[[x,y]],curve:false};r.subs.push(r.cur);return o.moveTo.call(this,x,y)};
+  P.lineTo=function(x,y){const r=rec(this);if(!r.cur){r.cur={pts:[],curve:false};r.subs.push(r.cur)}r.cur.pts.push([x,y]);return o.lineTo.call(this,x,y)};
+  P.rect=function(x,y,w,h){const r=rec(this);r.subs.push({pts:[[x,y],[x+w,y],[x+w,y+h],[x,y+h]],curve:false});r.cur=null;return o.rect.call(this,x,y,w,h)};
+  for(const k of ['bezierCurveTo','quadraticCurveTo','arc','arcTo','ellipse','roundRect','addPath'])if(o[k])P[k]=function(){const r=rec(this);if(r.cur)r.cur.curve=true;else r.subs.push(r.cur={pts:[],curve:true});return o[k].apply(this,arguments)};
+})();
+function zfDrawFlat(ctx,subs){ // subs: 장치 좌표 하위경로 목록
+  for(const s of subs){
+    if(s.curve||s.pts.length<2)continue;
+    const [x0,y0]=s.pts[0];let ux=0,uy=0,L=0;
+    for(const [x,y] of s.pts){const d=Math.hypot(x-x0,y-y0);if(d>L){L=d;ux=(x-x0)/d;uy=(y-y0)/d}}
+    if(L<1)continue;                                                   // 1픽셀 미만 길이는 건드리지 않음
+    let flat=true,t0=0,t1=0;
+    for(const [x,y] of s.pts){const dx=x-x0,dy=y-y0;if(Math.abs(dx*uy-dy*ux)>1e-6){flat=false;break}const t=dx*ux+dy*uy;if(t<t0)t0=t;if(t>t1)t1=t}
+    if(!flat)continue;                                                 // 면적이 있는 도형은 원래대로
+    const p=new Path2D();let ax=x0+ux*t0,ay=y0+uy*t0,bx=x0+ux*t1,by=y0+uy*t1;
+    if(Math.abs(uy)<1e-9){ay=by=Math.floor(ay)+0.5}else if(Math.abs(ux)<1e-9){ax=bx=Math.floor(ax)+0.5} // 수평·수직선은 픽셀 칸에 맞춤
+    p.moveTo(ax,ay);p.lineTo(bx,by);
+    ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=1;ctx.setLineDash([]);ctx.stroke(p);ctx.restore();
+  }
+}
+function pdfCtx(ctx){
+  if(!ctx||ctx.__zf)return ctx;ctx.__zf=true;
+  const P=CanvasRenderingContext2D.prototype;let subs=[],cur=null;
+  const dev=(x,y,t=ctx.getTransform())=>[t.a*x+t.c*y+t.e,t.b*x+t.d*y+t.f];
+  const start=(x,y)=>{cur={pts:[dev(x,y)],curve:false};subs.push(cur)};
+  ctx.beginPath=function(){subs=[];cur=null;return P.beginPath.call(this)};
+  ctx.moveTo=function(x,y){start(x,y);return P.moveTo.call(this,x,y)};
+  ctx.lineTo=function(x,y){if(!cur)start(x,y);else cur.pts.push(dev(x,y));return P.lineTo.call(this,x,y)};
+  ctx.rect=function(x,y,w,h){cur={pts:[dev(x,y),dev(x+w,y),dev(x+w,y+h),dev(x,y+h)],curve:false};subs.push(cur);const r=P.rect.call(this,x,y,w,h);cur=null;return r};
+  for(const k of ['bezierCurveTo','quadraticCurveTo','arc','arcTo','ellipse','roundRect'])if(P[k])ctx[k]=function(){if(cur)cur.curve=true;else subs.push(cur={pts:[],curve:true});return P[k].apply(this,arguments)};
+  ctx.fill=function(a){
+    const r=P.fill.apply(this,arguments);
+    if(a instanceof Path2D){                                           // pdf.js 5.x·6.x: 경로를 Path2D로 그림
+      const rec=ZF_PATHS.get(a);if(!rec)return r;                     // 문자열로 만든 Path2D(글자 윤곽 등)는 기록이 없어 건드리지 않음
+      const t=this.getTransform();zfDrawFlat(this,rec.subs.map(s=>({curve:s.curve,pts:s.pts.map(([x,y])=>dev(x,y,t))})));
+    }else zfDrawFlat(this,subs);                                       // pdf.js 4.x: canvas에 직접 그림
+    return r};
+  return ctx;
+}
+
 async function ensurePdfJs(){
   if(pdfjsLib)return pdfjsLib;
   try{
-    pdfjsLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
+    pdfjsLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/legacy/build/pdf.min.mjs');
     if(pdfjsLib?.GlobalWorkerOptions){
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/legacy/build/pdf.worker.min.mjs';
     }
     return pdfjsLib;
   }catch(err){
@@ -1152,7 +1200,7 @@ async function renderPageBitmap({kind,pdfPage,img,viewport,cssW,cssH,k}){
   try{
     const ctx=canvas.getContext('2d',{alpha:false});
     if(!ctx)throw new Error('canvas 2D 컨텍스트를 만들 수 없습니다.');
-    if(kind==='pdf')await pdfPage.render({canvasContext:ctx,viewport,transform:[k,0,0,k,0,0]}).promise;
+    if(kind==='pdf')await pdfPage.render({canvasContext:pdfCtx(ctx),viewport,transform:[k,0,0,k,0,0]}).promise;
     else ctx.drawImage(img,0,0,canvas.width,canvas.height);
     return canvas;
   }catch(error){releaseCanvas(canvas);throw renderError(error)}
@@ -1166,18 +1214,35 @@ function appendPage({i,canvas,viewport,scale,pdfW,pdfH,imgW,imgH,k}){
   state.pages.push({page:i,wrap,canvas,overlay,pdfW,pdfH,viewW:viewport.width,viewH:viewport.height,
     ...(imgW?{imgW,imgH}:{}),scale,displayK:k});
 }
-async function renderPdf(){
+// 글자를 PDF 안 글꼴의 윤곽선 그대로 그린다(disableFontFace). 웹폰트 경로에서 일부 글자 모양이 틀어지는 문제 대응.
+// 단, PDF에 글꼴이 포함되지 않은 문서는 이 방식에서 글자가 그려지지 않으므로 기존 방식으로 다시 연다.
+// 글자를 PDF 안 글꼴의 윤곽선 그대로 그린다(disableFontFace). 웹폰트 경로에서 일부 글자 모양이 틀어지는 문제 대응.
+// PDF에 포함되지 않은 글꼴이 있으면 이 방식에서 글자가 빠지므로 기존 방식(웹폰트·시스템 글꼴 대체)으로 다시 연다.
+// 첫 화면을 늦추지 않도록 1쪽만 미리 확인하고, 나머지 쪽은 렌더가 끝난 뒤 확인한다(renderPdf 끝).
+function pdfHasMissingFont(page){for(const [,obj] of page.commonObjs)if(obj&&obj.missingFile)return true;return false}
+async function openPdfDoc(pdfjs,extra,forceFace=false){
+  const base={cMapUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/cmaps/',cMapPacked:true,standardFontDataUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/standard_fonts/',...extra};
+  if(!forceFace){
+    const task=pdfjs.getDocument({...base,data:state.bytes.slice(0),disableFontFace:true}),doc=await task.promise;
+    let missing=false;
+    try{const p1=await doc.getPage(1);await p1.getOperatorList();missing=pdfHasMissingFont(p1)}
+    catch(e){console.warn('글꼴 포함 여부 확인 실패 — 기존 방식으로 엽니다',e);missing=true}
+    if(!missing){state.fontPathMode=true;state.pdfTask=task;return doc}
+    await task.destroy();
+  }
+  const task=pdfjs.getDocument({...base,data:state.bytes.slice(0)});
+  state.fontPathMode=false;state.pdfTask=task;return await task.promise;
+}
+async function renderPdf(forceFace=false){
   const pdfjs=await ensurePdfJs();
   $('viewer').innerHTML='';
   let loadingTask=null;
   try{
-    loadingTask=pdfjs.getDocument({data:state.bytes.slice(0),cMapUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',cMapPacked:true,standardFontDataUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/standard_fonts/'});
-    state.pdf=await loadingTask.promise;
+    state.pdf=await openPdfDoc(pdfjs,{},forceFace);
   }catch(e){
     console.warn('PDF worker 방식 실패, disableWorker로 재시도',e);
     try{
-      loadingTask=pdfjs.getDocument({data:state.bytes.slice(0),cMapUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',cMapPacked:true,standardFontDataUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/standard_fonts/',disableWorker:true});
-      state.pdf=await loadingTask.promise;
+      state.pdf=await openPdfDoc(pdfjs,{disableWorker:true},forceFace);
     }catch(e2){throw new Error('PDF 파싱/렌더링 실패: '+String(e2?.message||e2))}
   }
 
@@ -1219,6 +1284,11 @@ async function renderPdf(){
     plan.overBudget?'1배 예산 초과':'',fallbackPages.length?`쪽별 1배 재시도: ${[...new Set(fallbackPages)].join(',')}`:'',
     globalFallback?'전체 1배 고정':''].filter(Boolean));
   state.lowResolutionLocked=globalFallback;
+  // 2쪽 이후에 포함되지 않은 글꼴이 있으면(드묾) 기존 글꼴 방식으로 다시 그린다
+  if(state.fontPathMode&&!forceFace&&state.pdf.numPages>1){
+    let missing=false;try{missing=pdfHasMissingFont(await state.pdf.getPage(1))}catch(e){missing=true}
+    if(missing){log('글꼴 방식 전환 후 다시 그리는 중...');releasePageCanvases();state.pages=[];await state.pdfTask?.destroy();return renderPdf(true)}
+  }
 }
 async function renderImage(file){
   const url=URL.createObjectURL(file);
@@ -3460,7 +3530,7 @@ async function renderPdfPageToCanvasForJpg(p){
   ctx.fillStyle='#ffffff';
   ctx.fillRect(0,0,out.width,out.height);
   ctx.restore();
-  await pdfPage.render({canvasContext:ctx,viewport}).promise;
+  await pdfPage.render({canvasContext:pdfCtx(ctx),viewport}).promise;
 
   await drawFieldsOnExportCanvas(ctx,p,k,k);
   return out;
