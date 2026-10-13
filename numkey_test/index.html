@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>숫자 입력 방식 실험실</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 레이아웃: 위에서 아래로 한 줄. 입력칸 카드마다 그 칸의 최근 이벤트를 바로 아래에 둔다 (키보드가 화면 아래를 가려도 보이게). 전체 기록은 맨 아래. */
+:root {
+  --bg: #f3f5f7;
+  --panel: #ffffff;
+  --fg: #17202a;
+  --muted: #5b6875;
+  --line: #d9dfe6;
+  --accent: #0b6e69;
+  --key: #3b4cca;
+  --key-bg: #e8ebff;
+  --text: #9a5b00;
+  --text-bg: #fff1d6;
+  --bad: #b42318;
+  --bad-bg: #fde8e6;
+  --code-bg: #eef1f4;
+  --ime: #8a3fa0;
+  --ime-bg: #f6e8fb;
+  --font-body: "IBM Plex Sans KR", "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --panel: #192129; --fg: #e5eaf0; --muted: #98a5b3; --line: #2b3640;
+    --accent: #4fc1b8; --key: #9fa9ff; --key-bg: #262c5a; --text: #f2b856; --text-bg: #3d2c0c;
+    --bad: #ff8a80; --bad-bg: #4a1d1a; --code-bg: #212b34; --ime: #e3a6f5; --ime-bg: #3b2145; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --panel: #192129; --fg: #e5eaf0; --muted: #98a5b3; --line: #2b3640;
+  --accent: #4fc1b8; --key: #9fa9ff; --key-bg: #262c5a; --text: #f2b856; --text-bg: #3d2c0c;
+  --bad: #ff8a80; --bad-bg: #4a1d1a; --code-bg: #212b34; --ime: #e3a6f5; --ime-bg: #3b2145; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body);
+  font-size: 15px; line-height: 1.55;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 1.45rem; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.05rem; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.lead { color: var(--muted); max-width: 62ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.84em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+
+.steps { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.steps ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
+.legend-box summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+.legend-box[open] summary { margin-bottom: 10px; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.legend div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.legend .tag { align-self: flex-start; }
+
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bar label { color: var(--muted); font-size: 0.9rem; }
+.bar input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); min-width: 0; flex: 1 1 160px; }
+button { font: inherit; font-size: 0.9rem; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 500; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.fields { display: flex; flex-direction: column; gap: 14px; }
+.field { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.field.sim { border-style: dashed; }
+.field-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
+.field-head .attrs { color: var(--muted); }
+.field .hint { color: var(--muted); font-size: 0.88rem; }
+.field input.probe { font: inherit; font-size: 1.15rem; font-family: var(--font-mono); padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); width: 100%; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 0.88rem; }
+.stats .num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+.tag { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em; white-space: nowrap; }
+.tag.key { background: var(--key-bg); color: var(--key); }
+.tag.text { background: var(--text-bg); color: var(--text); }
+.tag.bad { background: var(--bad-bg); color: var(--bad); }
+.tag.none { background: var(--code-bg); color: var(--muted); }
+.tag.ime { background: var(--ime-bg); color: var(--ime); }
+.recent { font-family: var(--font-mono); font-size: 0.76rem; background: var(--code-bg); border-radius: 8px; padding: 8px 10px; min-height: 2.4em; overflow-x: auto; white-space: pre; color: var(--fg); }
+
+.log-panel { display: flex; flex-direction: column; gap: 10px; }
+.log { font-family: var(--font-mono); font-size: 0.76rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-height: 420px; overflow: auto; white-space: pre; }
+.log .k { color: var(--key); }
+.log .t { color: var(--text); }
+.log .b { color: var(--bad); }
+.log .i { color: var(--ime); }
+.note { color: var(--muted); font-size: 0.88rem; max-width: 64ch; }
+@media (prefers-reduced-motion: no-preference) { .flash { animation: flash .5s ease-out; } }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <h1>숫자 입력 방식 실험실</h1>
+    <p class="lead">입력칸마다 숫자가 들어올 때 크롬이 어떤 이벤트를 함께 전달했는지 기록합니다. 같은 칸을 삼성 키보드와 M키보드로 번갈아 입력해 비교하세요.</p>
+    <p class="note">이 페이지가 보는 것은 크롬의 웹 이벤트입니다. 키보드가 안드로이드에서 어떤 함수를 불렀는지는 직접 알 수 없고, 이벤트 모양으로 추정할 뿐입니다.</p>
+  </header>
+
+  <details class="legend-box">
+  <summary>판정 기준 보기</summary>
+  <section class="legend" aria-label="판정 기준">
+    <div><span class="tag key">숫자 키 이벤트 동반</span><span class="mono">keydown key="1" → input data="1"</span><span class="note">수정키 없이 누른 숫자 키의 keydown이 먼저 오고, 들어온 글자가 그 숫자와 같음. 키보드가 숫자 키 이벤트를 보냈을 가능성이 큼</span></div>
+    <div><span class="tag ime">IME 처리 키 이벤트 동반</span><span class="mono">keydown keyCode=229 / Unidentified / Process → input</span><span class="note">입력기 처리 표시만 옴. 키보드가 글자를 바로 넣었을 가능성이 큼 (함수는 확정 못 함)</span></div>
+    <div><span class="tag text">키 이벤트 없이 삽입</span><span class="mono">input만 옴</span><span class="note">keydown 없이 값이 바뀜</span></div>
+    <div><span class="tag none">판정 불가 · 붙여넣기</span><span class="mono">data 없음 / 숫자 아닌 키·수정키 / 키와 글자 불일치 / insertFromPaste</span><span class="note">위 셋 중 하나로 단정하지 않음</span></div>
+    <div><span class="tag bad">삽입 미관찰 · 길이 제한 추정</span><span class="mono">숫자 keydown → (input 없음) → keyup</span><span class="note">값이 그대로임. 길이가 가득 찬 칸이면 길이 제한으로 추정하고, 그 밖에는 원인을 단정하지 않음</span></div>
+    <div><span class="tag bad">모형: 거부·막힘</span><span class="mono">점선 칸</span><span class="note">모형 칸이 일부러 거부하거나 막은 입력</span></div>
+  </section>
+  </details>
+
+  <div class="bar">
+    <label for="kbd">지금 키보드</label>
+    <input id="kbd" type="text" placeholder="예: 삼성 / M키보드 c1cdcfb" autocomplete="off" data-nolog="1">
+    <button id="copy" class="primary" type="button">결과 복사</button>
+    <button id="clear" type="button">모두 지우기</button>
+  </div>
+
+  <section class="steps" aria-label="시험 순서">
+    <h2>시험 순서</h2>
+    <ol>
+      <li>"지금 키보드"에 키보드 이름을 적습니다.</li>
+      <li>모든 칸에서 <code>1</code> <code>2</code> <code>3</code> <code>4</code>를 한 번씩 누릅니다.</li>
+      <li>최대 2자리 칸: 2단계 뒤 남아 있는 <code>12</code>를 길게 눌러 전체 선택하고 <code>3</code>을 누릅니다. 다시 입력하지 마세요.</li>
+      <li>"결과 복사"를 누르고 복사한 내용을 메모 등에 따로 보관한 뒤, "모두 지우기"를 누르고 다른 키보드로 같은 순서를 반복합니다.</li>
+    </ol>
+  </section>
+  <p class="note">횟수는 관찰된 삽입 이벤트, 삽입이 관찰되지 않은 숫자 키 이벤트, 모형 칸이 처리한 숫자 키 이벤트를 센 값입니다. 숫자를 한 번씩 누르는 비교용이라 여러 키를 동시에 누르면 정확히 세지 않습니다. 실제로 누른 횟수와 다를 수 있으니 기록과 최종 값을 함께 보세요.</p>
+  <section class="fields" id="fields" aria-label="입력칸"></section>
+
+  <section class="log-panel" aria-label="전체 이벤트 기록">
+    <h2>전체 이벤트 기록 <span class="note">(최신이 위)</span></h2>
+    <div class="log" id="log" role="log"></div>
+    <p class="note">웹페이지에서는 크롬이 받은 결과만 보입니다. 앱의 시간 선택 부품 같은 기본 부품은 똑같이 만들 수 없어서, 점선 칸은 원리만 보여 주는 모형입니다. 키보드가 받는 칸 종류(안드로이드 <code>EditorInfo.inputType</code>)는 이 페이지에서 알 수 없으니 M키보드 진단 기록에서 확인하세요. 기록의 inputType은 웹 이벤트의 값이라 다른 것입니다. <code>type="time"</code>은 크롬에서 키보드 대신 선택 창이 떠서 넣지 않았습니다.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  // 입력칸 정의. mode: keyOnly = 숫자 keydown만 받는 모형 / blockKeys = 숫자 keydown을 가로채는 모형
+  var FIELDS = [
+    { id: "f-text", name: "일반 글자", attrs: 'type="text"', html: { type: "text" } },
+    { id: "f-number", name: "숫자", attrs: 'type="number"', html: { type: "number" } },
+    { id: "f-tel", name: "전화번호", attrs: 'type="tel"', html: { type: "tel" } },
+    { id: "f-numeric", name: "숫자 전용 (inputmode)", attrs: 'inputmode="numeric"', html: { type: "text", inputmode: "numeric" } },
+    { id: "f-decimal", name: "소수 (inputmode)", attrs: 'inputmode="decimal"', html: { type: "text", inputmode: "decimal" } },
+    { id: "f-pin", name: "숫자 비밀번호", attrs: 'type="password" inputmode="numeric"', html: { type: "password", inputmode: "numeric" } },
+    { id: "f-max2", name: "최대 2자리", attrs: 'inputmode="numeric" maxlength="2"', html: { type: "text", inputmode: "numeric", maxlength: "2" },
+      hint: "세 번째 숫자부터는 브라우저가 막습니다. 숫자 키 이벤트가 관찰된 경우에만 '길이 제한 추정'으로 셀 수 있고, 키 이벤트 없이 막힌 입력은 이벤트가 없어 셀 수 없습니다." },
+    { id: "f-keyonly", name: "키 이벤트만 받는 칸", attrs: "모형: 숫자 keydown만 받고, 그 밖의 삽입은 되돌림", html: { type: "text", inputmode: "numeric" }, mode: "keyOnly", sim: true,
+      hint: "키 이벤트만 받는 부품의 원리를 보여 주는 모형입니다. 최근 숫자 2자리만 남기고 커서 위치는 무시합니다. 실제 시간 선택 부품과 같지 않습니다. 집계: 모형이 받은 숫자 키 이벤트, 모형이 되돌린 삽입 이벤트." },
+    { id: "f-block", name: "숫자 키를 가로채는 칸", attrs: "모형: 숫자 keydown의 기본 동작을 막음", html: { type: "text" }, mode: "blockKeys", sim: true,
+      hint: "숫자 키를 단축키로 쓰는 화면의 원리를 보여 주는 모형입니다. 숫자 키 이벤트로 오면 입력되지 않습니다. 집계: 모형이 막은 숫자 키 이벤트, 관찰된 삽입 이벤트." }
+  ];
+
+  // 판정 분류. 횟수는 관찰된 삽입(input) 이벤트, 삽입이 관찰되지 않은 숫자 키 이벤트, 모형 칸이 처리한 숫자 키 이벤트를 센다.
+  // 숫자를 한 번씩 누르는 비교용이다. 여러 키를 동시에 누르면 앞선 키 상태를 덮어써 정확히 세지 않는다. 실제 타수와 다를 수 있다.
+  var CAT = {
+    key:      { label: "숫자 키 이벤트 동반",        tag: "key",  log: "k" },
+    ime:      { label: "IME 처리 키 이벤트 동반",     tag: "ime",  log: "i" },
+    nokey:    { label: "키 이벤트 없이 삽입",        tag: "text", log: "t" },
+    paste:    { label: "붙여넣기",                  tag: "none", log: "" },
+    unknown:  { label: "판정 불가",                 tag: "none", log: "" },
+    noinsert: { label: "숫자 키 이벤트 후 삽입 미관찰", tag: "bad",  log: "b" },
+    lenlimit: { label: "길이 제한 추정",             tag: "bad",  log: "b" },
+    model:    { label: "모형: 거부·막힘",            tag: "bad",  log: "b" }
+  };
+  var ORDER = ["key", "ime", "nokey", "paste", "unknown", "noinsert", "lenlimit", "model"];
+  var DOWN_TTL = 1500; // keyup이 오지 않는 경우를 위한 상한 (ms)
+
+  var host = document.getElementById("fields");
+  var logEl = document.getElementById("log");
+  var lines = [];
+  var state = {};
+  var t0 = performance.now();
+
+  function ms() { return ((performance.now() - t0) / 1000).toFixed(2).padStart(7, " "); }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  function q(v) { return v === null || v === undefined ? "null" : JSON.stringify(String(v)); }
+  function isImeKey(e) { return e.keyCode === 229 || e.key === "Unidentified" || e.key === "Process"; }
+  function sel(el) {
+    try { return el.selectionStart === null ? "-" : el.selectionStart + ".." + el.selectionEnd; } catch (e) { return "-"; }
+  }
+
+  FIELDS.forEach(function (f) {
+    var card = document.createElement("div");
+    card.className = "field" + (f.sim ? " sim" : "");
+    var counts = ORDER.map(function (c) {
+      return '<span>' + CAT[c].label + ' <span class="num" data-count="' + c + '">0</span></span>';
+    }).join("");
+    card.innerHTML =
+      '<div class="field-head"><h2>' + esc(f.name) + '</h2><span class="attrs mono">' + esc(f.attrs) + '</span></div>' +
+      (f.hint ? '<p class="hint">' + esc(f.hint) + '</p>' : '') +
+      '<input class="probe" id="' + f.id + '" autocomplete="off" autocorrect="off" spellcheck="false">' +
+      '<div class="stats"><span>마지막 판정</span><span class="tag none" data-role="last">없음</span>' +
+      '<span>값 <span class="num" data-role="val">""</span></span></div>' +
+      '<div class="stats">' + counts + '</div>' +
+      '<div class="recent" data-role="recent" aria-live="polite"></div>';
+    host.appendChild(card);
+    var el = card.querySelector("input");
+    Object.keys(f.html).forEach(function (k) { el.setAttribute(k, f.html[k]); });
+    var st = { f: f, el: el, card: card, n: {}, recent: [], down: null, kept: "", pb: null };
+    ORDER.forEach(function (c) { st.n[c] = 0; });
+    state[f.id] = st;
+    wire(st);
+  });
+
+  function showVal(s) { s.card.querySelector('[data-role="val"]').textContent = JSON.stringify(s.el.value); }
+
+  function count(s, cat, extra) {
+    s.n[cat]++;
+    s.card.querySelector('[data-count="' + cat + '"]').textContent = s.n[cat];
+    var tag = s.card.querySelector('[data-role="last"]');
+    tag.className = "tag " + CAT[cat].tag;
+    tag.textContent = CAT[cat].label + (extra ? " · " + extra : "");
+    s.card.classList.remove("flash"); void s.card.offsetWidth; s.card.classList.add("flash");
+  }
+
+  function record(s, cls, text) {
+    var line = ms() + "  " + s.f.name + "  " + text;
+    s.recent.unshift(line.replace(/^\s+/, ""));
+    if (s.recent.length > 5) s.recent.length = 5;
+    s.card.querySelector('[data-role="recent"]').textContent = s.recent.join("\n");
+    lines.unshift({ cls: cls, text: line });
+    if (lines.length > 500) lines.length = 500;
+    logEl.innerHTML = lines.map(function (l) { return '<span class="' + l.cls + '">' + esc(l.text) + "</span>"; }).join("\n");
+  }
+
+  // 아직 처리되지 않은(같은 입력 시도에 속한) keydown. 오래됐으면 버린다.
+  function pending(s) {
+    var d = s.down;
+    if (!d || d.used || performance.now() - d.t > DOWN_TTL) return null;
+    return d;
+  }
+
+  // keydown 하나를 마무리한다. 숫자 키 이벤트가 왔는데 삽입이 관찰되지 않았으면 기록한다.
+  function finish(s, d, why) {
+    if (!d || d.used || performance.now() - d.t > DOWN_TTL) return;
+    var el = s.el;
+    d.used = true;
+    if (d.digit && el.value === d.value) {
+      var max = parseInt(el.getAttribute("maxlength") || "0", 10);
+      // keydown 당시의 길이와 선택 영역으로 판단한다.
+      if (max > 0 && d.value.length >= max && d.collapsed) {
+        record(s, "b", "  → 길이가 가득 찬 상태에서 숫자 키 이벤트: 길이 제한 추정" + (why ? " (" + why + ")" : ""));
+        count(s, "lenlimit", why);
+      } else {
+        record(s, "b", "  → 숫자 키 이벤트 후 삽입 미관찰" + (why ? " (" + why + ")" : ""));
+        count(s, "noinsert", why);
+      }
+    } else if (d.ime && el.value === d.value) {
+      record(s, "", "  → IME 처리 키 이벤트 후 값 변화 없음 (세지 않음)");
+    }
+  }
+
+  function wire(s) {
+    var el = s.el, mode = s.f.mode;
+
+    el.addEventListener("keydown", function (e) {
+      var ime = isImeKey(e);
+      var mods = e.ctrlKey || e.altKey || e.metaKey;
+      var digit = !ime && !mods && /^[0-9]$/.test(e.key);
+      // 같은 키가 반복되면(길게 누름) 앞선 keydown을 먼저 마무리한다.
+      if (e.repeat && s.down && s.down.code === e.code) finish(s, s.down, "반복");
+      s.pb = null; // 새 입력 시도: 이전 beforeinput 정보는 버린다
+      var collapsed = true;
+      try { collapsed = el.selectionStart === el.selectionEnd; } catch (x) {}
+      s.down = { key: e.key, code: e.code, ime: ime, digit: digit, t: performance.now(), used: false, value: el.value, collapsed: collapsed };
+      record(s, ime ? "i" : "k", "keydown  key=" + q(e.key) + " code=" + q(e.code) + " keyCode=" + e.keyCode +
+        " trusted=" + e.isTrusted + (e.repeat ? " 반복" : "") + (e.isComposing ? " composing" : "") +
+        " Ctrl=" + (e.ctrlKey ? 1 : 0) + " Alt=" + (e.altKey ? 1 : 0) + " Meta=" + (e.metaKey ? 1 : 0) + " Shift=" + (e.shiftKey ? 1 : 0));
+      if (!digit) return;
+      if (mode === "keyOnly") {
+        e.preventDefault();
+        var v = (el.value + e.key).slice(-2);
+        el.value = v; s.kept = v; s.down.used = true;
+        record(s, "k", "  → 모형: 숫자 키 이벤트 받음, 값=" + q(v));
+        count(s, "key", "모형이 받음"); showVal(s);
+      } else if (mode === "blockKeys") {
+        e.preventDefault();
+        s.down.used = true;
+        record(s, "b", "  → 모형: 숫자 키 이벤트 막음 (입력 안 됨)");
+        count(s, "model", "숫자 키 막힘"); showVal(s);
+      }
+    });
+
+    el.addEventListener("beforeinput", function (e) {
+      s.pb = { type: e.inputType || "", data: e.data === undefined ? null : e.data, value: el.value };
+      record(s, "", "beforeinput  inputType=" + q(e.inputType) + " data=" + q(e.data) + " 선택=" + sel(el) +
+        (e.cancelable ? "" : " (취소 불가)"));
+    });
+
+    el.addEventListener("input", function (e) {
+      var type = e.inputType || "";
+      var insert = /^insert/.test(type);
+      var d = pending(s);
+      if (d) d.used = true;
+      // 이번 input과 inputType·data가 같은 beforeinput이 있을 때만 입력 전 값으로 쓴다.
+      var pb = s.pb, edata = e.data === undefined ? null : e.data;
+      var prev = (pb && pb.type === type && pb.data === edata) ? q(pb.value) : "(입력 전 값 미관찰)";
+      s.pb = null;
+      var base = "input  inputType=" + q(type) + " data=" + q(e.data) + " composing=" + !!e.isComposing +
+        " trusted=" + e.isTrusted + " 값 " + prev + "→" + q(el.value) + " 선택=" + sel(el);
+      if (!insert) { record(s, "", base); if (mode === "keyOnly") s.kept = el.value; showVal(s); return; }
+
+      var cat;
+      if (type === "insertFromPaste" || type === "insertFromDrop") cat = "paste";
+      else if (!d) cat = "nokey";
+      else if (d.ime) cat = "ime";
+      else if (!d.digit) cat = "unknown"; // 숫자가 아닌 키, 수정키가 눌린 키
+      else if (e.data === null || e.data === undefined) cat = "unknown";
+      else if (e.data === d.key) cat = "key";
+      else cat = "unknown"; // 키와 들어온 글자가 다름
+
+      if (mode === "keyOnly") {
+        el.value = s.kept;
+        record(s, "b", base + "  → 모형: " + CAT[cat].label + " 삽입 거부, 값 되돌림");
+        count(s, "model", CAT[cat].label + " 거부");
+        showVal(s);
+        return;
+      }
+      record(s, CAT[cat].log, base + "  → " + CAT[cat].label);
+      count(s, cat);
+      showVal(s);
+    });
+
+    el.addEventListener("keyup", function (e) {
+      record(s, isImeKey(e) ? "i" : "k", "keyup  key=" + q(e.key) + " code=" + q(e.code) + " keyCode=" + e.keyCode);
+      // 저장된 keydown과 같은 키의 keyup일 때만 마무리한다.
+      if (s.down && s.down.code === e.code && s.down.key === e.key) { finish(s, s.down, ""); s.down = null; }
+    });
+
+    el.addEventListener("blur", function () { s.down = null; s.pb = null; });
+
+    ["compositionstart", "compositionupdate", "compositionend"].forEach(function (type) {
+      el.addEventListener(type, function (e) { record(s, "i", type + "  data=" + q(e.data)); });
+    });
+  }
+
+  function summary() {
+    var kbd = document.getElementById("kbd").value.trim() || "(키보드 이름 없음)";
+    var out = ["[숫자 입력 방식 실험실 4판] " + kbd, navigator.userAgent,
+      "횟수 기준: 관찰된 삽입 이벤트 + 삽입이 관찰되지 않은 숫자 키 이벤트 + 모형 칸이 처리한 숫자 키 이벤트. 숫자를 한 번씩 누르는 비교용이며 실제 타수와 다를 수 있음", ""];
+    FIELDS.forEach(function (f) {
+      var s = state[f.id];
+      out.push(f.name + " (" + f.attrs + ")");
+      out.push("  " + ORDER.map(function (c) { return CAT[c].label + " " + s.n[c]; }).join(" / ") + " / 값 " + JSON.stringify(s.el.value));
+    });
+    out.push("", "--- 이벤트 기록 (최신이 위) ---");
+    lines.forEach(function (l) { out.push(l.text); });
+    return out.join("\n");
+  }
+
+  document.getElementById("copy").addEventListener("click", function () {
+    var text = summary(), btn = this;
+    function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = "결과 복사"; }, 1800); }
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      if (ok) { done("복사됨"); return; }
+      logEl.textContent = text;
+      var r = document.createRange(); r.selectNodeContents(logEl);
+      var w = window.getSelection(); w.removeAllRanges(); w.addRange(r);
+      done("기록 창을 선택했어요. 길게 눌러 복사하세요");
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done("복사됨"); }, fallback);
+      } else fallback();
+    } catch (e) { fallback(); }
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    lines = []; logEl.innerHTML = "";
+    Object.keys(state).forEach(function (id) {
+      var s = state[id];
+      s.el.value = ""; s.kept = ""; s.recent = []; s.down = null; s.pb = null;
+      ORDER.forEach(function (c) { s.n[c] = 0; s.card.querySelector('[data-count="' + c + '"]').textContent = "0"; });
+      s.card.querySelector('[data-role="recent"]').textContent = "";
+      var tag = s.card.querySelector('[data-role="last"]'); tag.className = "tag none"; tag.textContent = "없음";
+      showVal(s);
+    });
+    t0 = performance.now();
+  });
+})();
+</script>
+
+</body>
+</html>
